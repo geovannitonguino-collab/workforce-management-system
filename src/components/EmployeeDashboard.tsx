@@ -5,6 +5,7 @@ import LeaveBalanceCard from '@/components/LeaveBalanceCard';
 import LeaveRequestForm from '@/components/LeaveRequestForm';
 import PayrollEstimate from '@/components/PayrollEstimate';
 import LeaveHistory from '@/components/LeaveHistory';
+import LeaveAnalytics from '@/components/LeaveAnalytics';
 import { User, Briefcase, Mail, CalendarDays } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 
@@ -36,6 +37,9 @@ export default function EmployeeDashboard({ employee }: Props) {
           <p className="text-xs text-muted-foreground">per hour</p>
         </div>
       </div>
+
+      {/* Analytics full width */}
+      <LeaveAnalytics employee={employee} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
