@@ -45,6 +45,7 @@ export default function EmployeeDashboard({ employee }: Props) {
         <div className="space-y-6">
           <PayrollEstimate employee={employee} />
           <LeaveBalanceCard employee={employee} />
+          <LeaveHistory employee={employee} />
         </div>
       </div>
     </div>
