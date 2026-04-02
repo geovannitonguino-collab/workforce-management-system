@@ -65,17 +65,8 @@ export function initializeStore(): void {
   if (!localStorage.getItem(KEYS.timeEntries)) {
     save(KEYS.timeEntries, []);
   }
-  {
-    const existing = load<any[]>(KEYS.leaveRequests, []);
-    if (existing.length === 0) {
-      save(KEYS.leaveRequests, [
-        { id: 'seed-1', employeeId: 'emp-001', category: 'sick', startDate: '2026-03-01', endDate: '2026-03-03', hours: 24, isPaid: true, unpaidHours: 0, status: 'approved', reason: 'Flu - 3 days', createdAt: '2026-03-01T10:00:00Z' },
-        { id: 'seed-2', employeeId: 'emp-001', category: 'pto', startDate: '2026-03-10', endDate: '2026-03-10', hours: 8, isPaid: true, unpaidHours: 0, status: 'pending', reason: 'Personal errands', createdAt: '2026-03-10T10:00:00Z' },
-        { id: 'seed-3', employeeId: 'emp-001', category: 'vacation', startDate: '2026-04-01', endDate: '2026-04-05', hours: 40, isPaid: true, unpaidHours: 0, status: 'approved', reason: 'Family trip', createdAt: '2026-03-15T10:00:00Z' },
-        { id: 'seed-4', employeeId: 'emp-001', category: 'personal', startDate: '2026-03-20', endDate: '2026-03-20', hours: 8, isPaid: false, unpaidHours: 8, status: 'rejected', reason: 'Moving day', createdAt: '2026-03-18T10:00:00Z' },
-        { id: 'seed-5', employeeId: 'emp-001', category: 'sick', startDate: '2026-02-15', endDate: '2026-02-15', hours: 8, isPaid: true, unpaidHours: 0, status: 'pending', reason: 'Headache', createdAt: '2026-02-15T10:00:00Z' },
-      ]);
-    }
+  if (!localStorage.getItem(KEYS.leaveRequests)) {
+    save(KEYS.leaveRequests, []);
   }
   if (!localStorage.getItem(KEYS.currentUser)) {
     save(KEYS.currentUser, seedEmployees[0].id);
