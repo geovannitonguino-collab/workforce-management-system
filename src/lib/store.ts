@@ -1,4 +1,4 @@
-import { Employee, TimeEntry, LeaveRequest } from '@/types/workforce';
+import { Employee, TimeEntry, LeaveRequest, MedicalProof } from '@/types/workforce';
 
 const KEYS = {
   employees: 'wms_employees',
