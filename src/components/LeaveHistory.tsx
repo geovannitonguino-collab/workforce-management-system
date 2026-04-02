@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { History, FileText, Eye, Calendar, Clock, X } from 'lucide-react';
+import { History, FileText, Eye, Calendar, Clock, X, Filter } from 'lucide-react';
 
 interface Props {
   employee: Employee;
@@ -36,20 +36,31 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
   rejected: 'destructive',
 };
 
+const categories = ['all', 'pto', 'sick', 'vacation', 'personal'] as const;
+const statuses = ['all', 'pending', 'approved', 'rejected'] as const;
+
 export default function LeaveHistory({ employee }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  const requests = store
+  const allRequests = store
     .getLeaveRequests()
     .filter((r) => r.employeeId === employee.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const requests = allRequests.filter((r) => {
+    if (filterCategory !== 'all' && r.category !== filterCategory) return false;
+    if (filterStatus !== 'all' && r.status !== filterStatus) return false;
+    return true;
+  });
 
   const getProofsForRequest = (requestId: string): MedicalProof[] => {
     return store.getMedicalProofsForRequest(requestId);
   };
 
-  if (requests.length === 0) {
+  if (allRequests.length === 0) {
     return (
       <div className="stat-card">
         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
@@ -69,12 +80,51 @@ export default function LeaveHistory({ employee }: Props) {
         <History className="h-5 w-5 text-primary" />
         Leave History
         <span className="ml-auto text-sm font-normal text-muted-foreground">
-          {requests.length} request{requests.length !== 1 ? 's' : ''}
+          {requests.length}/{allRequests.length}
         </span>
       </h3>
 
+      {/* Filters */}
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                filterCategory === cat
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/50 text-muted-foreground border-border/50 hover:bg-muted'
+              }`}
+            >
+              {cat === 'all' ? 'All Types' : categoryLabels[cat]}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="w-3.5 shrink-0" />
+          {statuses.map((st) => (
+            <button
+              key={st}
+              onClick={() => setFilterStatus(st)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors capitalize ${
+                filterStatus === st
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/50 text-muted-foreground border-border/50 hover:bg-muted'
+              }`}
+            >
+              {st === 'all' ? 'All Status' : st}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Request list */}
       <div className="space-y-3">
-        {requests.map((req) => {
+        {requests.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No requests match the selected filters.</p>
+        ) : requests.map((req) => {
           const proofs = getProofsForRequest(req.id);
           return (
             <div
