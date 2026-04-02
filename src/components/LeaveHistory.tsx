@@ -36,20 +36,31 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
   rejected: 'destructive',
 };
 
+const categories = ['all', 'pto', 'sick', 'vacation', 'personal'] as const;
+const statuses = ['all', 'pending', 'approved', 'rejected'] as const;
+
 export default function LeaveHistory({ employee }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  const requests = store
+  const allRequests = store
     .getLeaveRequests()
     .filter((r) => r.employeeId === employee.id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const requests = allRequests.filter((r) => {
+    if (filterCategory !== 'all' && r.category !== filterCategory) return false;
+    if (filterStatus !== 'all' && r.status !== filterStatus) return false;
+    return true;
+  });
 
   const getProofsForRequest = (requestId: string): MedicalProof[] => {
     return store.getMedicalProofsForRequest(requestId);
   };
 
-  if (requests.length === 0) {
+  if (allRequests.length === 0) {
     return (
       <div className="stat-card">
         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
