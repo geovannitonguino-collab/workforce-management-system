@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { History, FileText, Eye, Calendar, Clock, X, Filter, Download } from 'lucide-react';
+import { History, FileText, Eye, Calendar, Clock, X, Filter, Download, FileSpreadsheet } from 'lucide-react';
 
 interface Props {
   employee: Employee;
