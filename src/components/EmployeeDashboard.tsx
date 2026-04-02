@@ -5,6 +5,7 @@ import LeaveBalanceCard from '@/components/LeaveBalanceCard';
 import LeaveRequestForm from '@/components/LeaveRequestForm';
 import PayrollEstimate from '@/components/PayrollEstimate';
 import LeaveHistory from '@/components/LeaveHistory';
+import LeaveAnalytics from '@/components/LeaveAnalytics';
 import { User, Briefcase, Mail, CalendarDays } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 
