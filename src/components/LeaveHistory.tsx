@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Employee, LeaveRequest, MedicalProof } from '@/types/workforce';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { store } from '@/lib/store';
 import { formatDate } from '@/lib/calculations';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { History, FileText, Eye, Calendar, Clock, X, Filter, Download } from 'lucide-react';
+import { History, FileText, Eye, Calendar, Clock, X, Filter, Download, FileSpreadsheet } from 'lucide-react';
 
 interface Props {
   employee: Employee;
@@ -62,6 +64,111 @@ function exportToCsv(requests: LeaveRequest[], employeeName: string) {
   URL.revokeObjectURL(url);
 }
 
+const categoryExcelColors: Record<string, { bg: string; font: string }> = {
+  pto: { bg: 'FFDBEAFE', font: 'FF1E40AF' },
+  sick: { bg: 'FFFED7AA', font: 'FF9A3412' },
+  vacation: { bg: 'FFD1FAE5', font: 'FF065F46' },
+  personal: { bg: 'FFE9D5FF', font: 'FF6B21A8' },
+};
+
+const statusExcelColors: Record<string, { bg: string; font: string }> = {
+  approved: { bg: 'FFD1FAE5', font: 'FF065F46' },
+  pending: { bg: 'FFFEF3C7', font: 'FF92400E' },
+  rejected: { bg: 'FFFEE2E2', font: 'FF991B1B' },
+};
+
+async function exportToExcel(requests: LeaveRequest[], employeeName: string) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Geovannix Workforce';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Leave History');
+
+  // Title row
+  ws.mergeCells('A1:I1');
+  const titleCell = ws.getCell('A1');
+  titleCell.value = `Leave History — ${employeeName}`;
+  titleCell.font = { size: 16, bold: true, color: { argb: 'FF1E293B' } };
+  titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+  ws.getRow(1).height = 32;
+
+  // Subtitle
+  ws.mergeCells('A2:I2');
+  const subCell = ws.getCell('A2');
+  subCell.value = `Exported ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} · ${requests.length} record(s)`;
+  subCell.font = { size: 10, italic: true, color: { argb: 'FF64748B' } };
+  ws.getRow(2).height = 20;
+
+  // Headers
+  const headers = ['Category', 'Status', 'Start Date', 'End Date', 'Hours', 'Days', 'Unpaid Hours', 'Reason', 'Submitted'];
+  const headerRow = ws.addRow(headers);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = {
+      bottom: { style: 'thin', color: { argb: 'FF334155' } },
+    };
+  });
+  headerRow.height = 24;
+
+  // Data rows
+  requests.forEach((r) => {
+    const row = ws.addRow([
+      categoryLabels[r.category],
+      r.status.charAt(0).toUpperCase() + r.status.slice(1),
+      formatDate(r.startDate),
+      formatDate(r.endDate),
+      r.hours,
+      Number((r.hours / 8).toFixed(1)),
+      r.unpaidHours,
+      r.reason || '',
+      formatDate(r.createdAt),
+    ]);
+
+    // Category cell color
+    const catColors = categoryExcelColors[r.category];
+    if (catColors) {
+      const catCell = row.getCell(1);
+      catCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: catColors.bg } };
+      catCell.font = { bold: true, size: 10, color: { argb: catColors.font } };
+    }
+
+    // Status cell color
+    const statColors = statusExcelColors[r.status];
+    if (statColors) {
+      const statCell = row.getCell(2);
+      statCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: statColors.bg } };
+      statCell.font = { bold: true, size: 10, color: { argb: statColors.font } };
+    }
+
+    // Unpaid hours highlight
+    if (r.unpaidHours > 0) {
+      const unpaidCell = row.getCell(7);
+      unpaidCell.font = { bold: true, size: 10, color: { argb: 'FFDC2626' } };
+    }
+
+    // Alternate row shading
+    row.eachCell((cell) => {
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { bottom: { style: 'hair', color: { argb: 'FFE2E8F0' } } };
+    });
+
+    // Reason left-aligned
+    row.getCell(8).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+  });
+
+  // Column widths
+  ws.columns = [
+    { width: 14 }, { width: 12 }, { width: 16 }, { width: 16 },
+    { width: 8 }, { width: 8 }, { width: 14 }, { width: 30 }, { width: 16 },
+  ];
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  saveAs(blob, `leave-history-${employeeName.replace(/\s+/g, '-').toLowerCase()}.xlsx`);
+}
+
 export default function LeaveHistory({ employee }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
@@ -107,19 +214,34 @@ export default function LeaveHistory({ employee }: Props) {
             {requests.length}/{allRequests.length}
           </span>
           {allRequests.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                exportToCsv(requests, employee.name);
-              }}
-              title="Export filtered results to CSV"
-            >
-              <Download className="h-3.5 w-3.5" />
-              CSV
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportToCsv(requests, employee.name);
+                }}
+                title="Export filtered results to CSV"
+              >
+                <Download className="h-3.5 w-3.5" />
+                CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportToExcel(requests, employee.name);
+                }}
+                title="Export filtered results to Excel"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Excel
+              </Button>
+            </div>
           )}
         </span>
       </h3>
