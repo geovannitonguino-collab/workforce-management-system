@@ -214,19 +214,34 @@ export default function LeaveHistory({ employee }: Props) {
             {requests.length}/{allRequests.length}
           </span>
           {allRequests.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                exportToCsv(requests, employee.name);
-              }}
-              title="Export filtered results to CSV"
-            >
-              <Download className="h-3.5 w-3.5" />
-              CSV
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportToCsv(requests, employee.name);
+                }}
+                title="Export filtered results to CSV"
+              >
+                <Download className="h-3.5 w-3.5" />
+                CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  exportToExcel(requests, employee.name);
+                }}
+                title="Export filtered results to Excel"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                Excel
+              </Button>
+            </div>
           )}
         </span>
       </h3>
