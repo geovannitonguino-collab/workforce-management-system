@@ -80,12 +80,45 @@ export default function LeaveHistory({ employee }: Props) {
         <History className="h-5 w-5 text-primary" />
         Leave History
         <span className="ml-auto text-sm font-normal text-muted-foreground">
-          {requests.length} request{requests.length !== 1 ? 's' : ''}
+          {requests.length}/{allRequests.length}
         </span>
       </h3>
 
-      <div className="space-y-3">
-        {requests.map((req) => {
+      {/* Filters */}
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(cat)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                filterCategory === cat
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/50 text-muted-foreground border-border/50 hover:bg-muted'
+              }`}
+            >
+              {cat === 'all' ? 'All Types' : categoryLabels[cat]}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="w-3.5 shrink-0" />
+          {statuses.map((st) => (
+            <button
+              key={st}
+              onClick={() => setFilterStatus(st)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors capitalize ${
+                filterStatus === st
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/50 text-muted-foreground border-border/50 hover:bg-muted'
+              }`}
+            >
+              {st === 'all' ? 'All Status' : st}
+            </button>
+          ))}
+        </div>
+      </div>
           const proofs = getProofsForRequest(req.id);
           return (
             <div
