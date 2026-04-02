@@ -119,6 +119,12 @@ export default function LeaveHistory({ employee }: Props) {
           ))}
         </div>
       </div>
+
+      {/* Request list */}
+      <div className="space-y-3">
+        {requests.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No requests match the selected filters.</p>
+        ) : requests.map((req) => {
           const proofs = getProofsForRequest(req.id);
           return (
             <div
