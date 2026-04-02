@@ -5,6 +5,7 @@ const KEYS = {
   timeEntries: 'wms_time_entries',
   leaveRequests: 'wms_leave_requests',
   currentUser: 'wms_current_user',
+  medicalProofs: 'wms_medical_proofs',
 };
 
 function load<T>(key: string, fallback: T): T {
