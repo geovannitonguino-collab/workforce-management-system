@@ -4,6 +4,7 @@ import TimeClock from '@/components/TimeClock';
 import LeaveBalanceCard from '@/components/LeaveBalanceCard';
 import LeaveRequestForm from '@/components/LeaveRequestForm';
 import PayrollEstimate from '@/components/PayrollEstimate';
+import LeaveHistory from '@/components/LeaveHistory';
 import { User, Briefcase, Mail, CalendarDays } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/lib/calculations';
 
@@ -44,6 +45,7 @@ export default function EmployeeDashboard({ employee }: Props) {
         <div className="space-y-6">
           <PayrollEstimate employee={employee} />
           <LeaveBalanceCard employee={employee} />
+          <LeaveHistory employee={employee} />
         </div>
       </div>
     </div>
