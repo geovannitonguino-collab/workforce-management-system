@@ -35,6 +35,14 @@ export interface DailyTimeSummary {
 
 export type LeaveCategory = 'sick' | 'pto' | 'vacation' | 'personal';
 
+export interface MedicalProof {
+  id: string;
+  leaveRequestId: string;
+  fileName: string;
+  fileData: string; // base64
+  uploadedAt: string;
+}
+
 export interface LeaveRequest {
   id: string;
   employeeId: string;
@@ -46,8 +54,8 @@ export interface LeaveRequest {
   unpaidHours: number;
   status: 'pending' | 'approved' | 'rejected';
   reason: string;
-  usesPtoBalance?: boolean; // for personal leave: opt-in to use PTO
-  medicalCertificateUrl?: string; // for sick leave
+  usesPtoBalance?: boolean;
+  medicalProofIds?: string[]; // references to MedicalProof entries
   createdAt: string;
 }
 

@@ -1,10 +1,11 @@
-import { Employee, TimeEntry, LeaveRequest } from '@/types/workforce';
+import { Employee, TimeEntry, LeaveRequest, MedicalProof } from '@/types/workforce';
 
 const KEYS = {
   employees: 'wms_employees',
   timeEntries: 'wms_time_entries',
   leaveRequests: 'wms_leave_requests',
   currentUser: 'wms_current_user',
+  medicalProofs: 'wms_medical_proofs',
 };
 
 function load<T>(key: string, fallback: T): T {
@@ -115,5 +116,28 @@ export const store = {
       employees[idx] = { ...employees[idx], ...updates };
       save(KEYS.employees, employees);
     }
+  },
+
+  // Medical Proofs
+  getMedicalProofs: (): MedicalProof[] => load(KEYS.medicalProofs, []),
+  addMedicalProof: (proof: MedicalProof) => {
+    const proofs = store.getMedicalProofs();
+    proofs.push(proof);
+    save(KEYS.medicalProofs, proofs);
+  },
+  updateMedicalProof: (id: string, updates: Partial<MedicalProof>) => {
+    const proofs = store.getMedicalProofs();
+    const idx = proofs.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      proofs[idx] = { ...proofs[idx], ...updates };
+      save(KEYS.medicalProofs, proofs);
+    }
+  },
+  deleteMedicalProof: (id: string) => {
+    const proofs = store.getMedicalProofs().filter(p => p.id !== id);
+    save(KEYS.medicalProofs, proofs);
+  },
+  getMedicalProofsForRequest: (leaveRequestId: string): MedicalProof[] => {
+    return store.getMedicalProofs().filter(p => p.leaveRequestId === leaveRequestId);
   },
 };
