@@ -5,7 +5,8 @@ import EmployeeDashboard from '@/components/EmployeeDashboard';
 import AdminDashboard from '@/components/AdminDashboard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Users, User, LayoutDashboard } from 'lucide-react';
+import { Users, User } from 'lucide-react';
+import geovannixLogo from '@/assets/geovannix-logo.png';
 
 export default function Index() {
   const [view, setView] = useState<AppView>('employee');
