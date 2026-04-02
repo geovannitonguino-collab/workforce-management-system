@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { CalendarPlus, AlertTriangle, Upload, ShieldAlert, Info } from 'lucide-react';
+import MedicalProofManager from '@/components/MedicalProofManager';
+import { CalendarPlus, AlertTriangle, ShieldAlert, Info, Stethoscope } from 'lucide-react';
 
 interface Props {
   employee: Employee;
@@ -22,13 +23,19 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
   const [hours, setHours] = useState('');
   const [reason, setReason] = useState('');
   const [usesPtoBalance, setUsesPtoBalance] = useState(false);
-  const [medicalCert, setMedicalCert] = useState<string>('');
+  // For sick leave: we create a "draft" leave request ID so proofs can be attached before submission
+  const [draftId] = useState(() => crypto.randomUUID());
+  const [proofsUploaded, setProofsUploaded] = useState(0);
 
   const year = new Date().getFullYear();
   const balance = calculateLeaveBalance(employee, store.getLeaveRequests(), year);
 
   const hoursNum = parseFloat(hours) || 0;
   const requestedDays = hoursNum / 8;
+
+  // Sick leave > 2 days requires medical proof
+  const isSickMultiDay = category === 'sick' && requestedDays > 2;
+  const sickProofRequired = isSickMultiDay && proofsUploaded === 0;
 
   // Validation
   const vacationError = category === 'vacation' && hoursNum > 0 && !canRequestVacation(balance, requestedDays)
@@ -39,7 +46,12 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
     ? calculateLeaveRequestPaidStatus({ category, hours: hoursNum, usesPtoBalance }, balance)
     : null;
 
-  const canSubmit = startDate && endDate && hoursNum > 0 && !vacationError;
+  const canSubmit = startDate && endDate && hoursNum > 0 && !vacationError && !sickProofRequired;
+
+  const handleProofUpdate = () => {
+    const proofs = store.getMedicalProofsForRequest(draftId);
+    setProofsUploaded(proofs.length);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,8 +62,12 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
       balance
     );
 
+    // Collect medical proof IDs
+    const proofs = store.getMedicalProofsForRequest(draftId);
+    const proofIds = proofs.map(p => p.id);
+
     const request: LeaveRequest = {
-      id: crypto.randomUUID(),
+      id: draftId,
       employeeId: employee.id,
       category,
       startDate,
@@ -62,7 +78,7 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
       status: 'pending',
       reason,
       usesPtoBalance: category === 'personal' ? usesPtoBalance : undefined,
-      medicalCertificateUrl: category === 'sick' ? medicalCert || undefined : undefined,
+      medicalProofIds: proofIds.length > 0 ? proofIds : undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -73,7 +89,7 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
     setHours('');
     setReason('');
     setUsesPtoBalance(false);
-    setMedicalCert('');
+    setProofsUploaded(0);
     onSubmit?.();
   };
 
@@ -126,6 +142,15 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
           </div>
         )}
 
+        {category === 'sick' && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-accent border border-primary/10">
+            <Stethoscope className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+            <p className="text-sm text-foreground">
+              Sick leave of <strong>1 day</strong>: no proof required. For <strong>2+ consecutive days</strong>, a medical certificate (PDF) is <strong>mandatory</strong> to process payment.
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label>Start Date</Label>
@@ -151,14 +176,22 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
           </div>
         )}
 
-        {/* Sick leave: medical certificate */}
+        {/* Sick leave: medical proof upload */}
         {category === 'sick' && (
-          <div>
+          <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
-              <Upload className="h-3.5 w-3.5" /> Medical Certificate (optional)
+              <Stethoscope className="h-3.5 w-3.5" />
+              Medical Proof {isSickMultiDay ? <span className="text-destructive font-semibold">(Required — more than 2 days)</span> : <span className="text-muted-foreground">(Optional for 1 day)</span>}
             </Label>
-            <Input type="text" placeholder="Paste URL or file reference..." value={medicalCert} onChange={e => setMedicalCert(e.target.value)} />
-            <p className="text-xs text-muted-foreground mt-1">Recommended for absences &gt; 1 day</p>
+            <MedicalProofManager leaveRequestId={draftId} onUpdate={handleProofUpdate} />
+            {sickProofRequired && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+                <p className="text-sm text-destructive font-medium">
+                  Medical proof is required for sick leave exceeding 2 consecutive days. Please upload a PDF.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
