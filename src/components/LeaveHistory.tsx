@@ -39,6 +39,29 @@ const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'o
 const categories = ['all', 'pto', 'sick', 'vacation', 'personal'] as const;
 const statuses = ['all', 'pending', 'approved', 'rejected'] as const;
 
+function exportToCsv(requests: LeaveRequest[], employeeName: string) {
+  const headers = ['Category', 'Status', 'Start Date', 'End Date', 'Hours', 'Days', 'Unpaid Hours', 'Reason', 'Submitted'];
+  const rows = requests.map((r) => [
+    categoryLabels[r.category],
+    r.status,
+    formatDate(r.startDate),
+    formatDate(r.endDate),
+    r.hours,
+    (r.hours / 8).toFixed(1),
+    r.unpaidHours,
+    `"${(r.reason || '').replace(/"/g, '""')}"`,
+    formatDate(r.createdAt),
+  ]);
+  const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `leave-history-${employeeName.replace(/\s+/g, '-').toLowerCase()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function LeaveHistory({ employee }: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
