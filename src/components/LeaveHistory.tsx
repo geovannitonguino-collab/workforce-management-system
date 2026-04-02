@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Employee, LeaveRequest, MedicalProof } from '@/types/workforce';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { store } from '@/lib/store';
 import { formatDate } from '@/lib/calculations';
 import { Badge } from '@/components/ui/badge';
