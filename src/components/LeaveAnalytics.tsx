@@ -52,11 +52,11 @@ export default function LeaveAnalytics({ employee }: Props) {
 
   // --- By month (bar) ---
   const byMonth = useMemo(() => {
-    const data = MONTHS.map((m) => ({ month: m, pto: 0, sick: 0, vacation: 0, personal: 0 }));
+    const data = MONTHS.map((m) => ({ month: m, pto: 0, sick: 0, vacation: 0, personal: 0 } as Record<string, string | number>));
     thisYearRequests.forEach((r) => {
       const monthIdx = new Date(r.createdAt).getMonth();
       if (data[monthIdx]) {
-        data[monthIdx][r.category as keyof typeof data[0]] += r.hours;
+        (data[monthIdx][r.category] as number) += r.hours;
       }
     });
     return data;
