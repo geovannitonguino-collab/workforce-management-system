@@ -42,7 +42,7 @@ export function calculateDailySummary(entries: TimeEntry[], employeeId: string, 
     totalMinutes = (new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 60000;
   }
 
-  const netWorkMinutes = Math.max(0, totalMinutes - lunchMinutes - breakMinutes);
+  const netWorkMinutes = Math.max(0, totalMinutes - lunchMinutes);
 
   return {
     date, employeeId, clockIn, clockOut,
