@@ -35,12 +35,10 @@ export default function Index() {
       {/* Top nav */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <LayoutDashboard className="h-5 w-5 text-primary-foreground" />
-            </div>
+          <div className="flex items-center gap-2">
+            <img src={geovannixLogo} alt="Geovannix" className="h-9" />
             <div>
-              <h1 className="text-base font-bold text-foreground leading-none">Freelance LATAM</h1>
+              <h1 className="text-base font-bold text-foreground leading-none">Geovannix</h1>
               <p className="text-xs text-muted-foreground">Workforce Management</p>
             </div>
           </div>
