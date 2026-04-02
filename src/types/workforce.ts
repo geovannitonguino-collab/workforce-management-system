@@ -3,10 +3,10 @@ export interface Employee {
   name: string;
   email: string;
   role: 'employee' | 'admin';
-  hourlyRate: number; // USD, 4 decimal precision
-  vacationAccrualRate: number; // days per month
-  paidPtoLimitHours: number; // total allowed paid PTO hours per year
-  hireDate: string; // ISO date
+  hourlyRate: number;
+  vacationAccrualRate: number; // fixed at 0.416 days/month
+  paidPtoLimitHours: number; // fixed at 40 (5 days × 8h)
+  hireDate: string;
   department: string;
   avatarUrl?: string;
 }
@@ -17,8 +17,8 @@ export interface TimeEntry {
   id: string;
   employeeId: string;
   action: ClockAction;
-  timestamp: string; // ISO datetime
-  date: string; // ISO date (YYYY-MM-DD)
+  timestamp: string;
+  date: string;
 }
 
 export interface DailyTimeSummary {
@@ -30,7 +30,7 @@ export interface DailyTimeSummary {
   lunchMinutes: number;
   breakMinutes: number;
   netWorkMinutes: number;
-  netWorkHours: number; // 4 decimal precision
+  netWorkHours: number;
 }
 
 export type LeaveCategory = 'sick' | 'pto' | 'vacation' | 'personal';
@@ -41,21 +41,23 @@ export interface LeaveRequest {
   category: LeaveCategory;
   startDate: string;
   endDate: string;
-  hours: number; // requested hours
-  isPaid: boolean; // auto-calculated
-  unpaidHours: number; // hours exceeding PTO limit
+  hours: number;
+  isPaid: boolean;
+  unpaidHours: number;
   status: 'pending' | 'approved' | 'rejected';
   reason: string;
+  usesPtoBalance?: boolean; // for personal leave: opt-in to use PTO
+  medicalCertificateUrl?: string; // for sick leave
   createdAt: string;
 }
 
 export interface LeaveBalance {
   employeeId: string;
   year: number;
-  totalPaidPtoHours: number; // contract limit
+  totalPaidPtoHours: number; // 40h (5 days)
   usedPaidPtoHours: number;
   remainingPaidPtoHours: number;
-  accruedVacationDays: number; // based on hire date
+  accruedVacationDays: number;
   usedVacationDays: number;
   remainingVacationDays: number;
 }
@@ -63,7 +65,7 @@ export interface LeaveBalance {
 export interface PayrollSummary {
   employeeId: string;
   employeeName: string;
-  period: string; // e.g., "2026-04"
+  period: string;
   totalWorkHours: number;
   hourlyRate: number;
   grossPay: number;
