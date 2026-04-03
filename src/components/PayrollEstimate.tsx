@@ -2,7 +2,8 @@ import React from 'react';
 import { Employee } from '@/types/workforce';
 import { store } from '@/lib/store';
 import { calculateDailySummary, calculatePayroll, getCurrentPeriod, formatCurrency, formatHours } from '@/lib/calculations';
-import { DollarSign, TrendingUp, Clock, CalendarCheck, ArrowRight } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CalendarCheck, ArrowRight, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
   employee: Employee;
@@ -25,7 +26,19 @@ export default function PayrollEstimate({ employee }: Props) {
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" /> Net Work Hours</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <Clock className="h-3 w-3" /> Total Paid Hours
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[220px] text-xs">
+                  Includes Work sessions and 15/20min Breaks. Excludes Lunch time.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </p>
           <p className="text-2xl font-bold text-foreground">{formatHours(payroll.totalWorkHours)}</p>
         </div>
         <div className="space-y-1">

@@ -3,6 +3,7 @@ import { ClockStatus, ClockAction, TimeEntry } from '@/types/workforce';
 import { store } from '@/lib/store';
 import { getToday, formatTime } from '@/lib/calculations';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Clock, Coffee, Utensils, LogIn, LogOut } from 'lucide-react';
 
 interface Segment {
@@ -77,10 +78,11 @@ function formatDurationMs(ms: number): string {
 
 interface Props {
   employeeId: string;
+  dailyGoalHours?: number;
   onUpdate?: () => void;
 }
 
-export default function TimeClock({ employeeId, onUpdate }: Props) {
+export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: Props) {
   const [status, setStatus] = useState<ClockStatus>({ isClockedIn: false, isOnLunch: false, isOnBreak: false, todayEntries: [] });
   const [now, setNow] = useState(new Date());
 
@@ -108,7 +110,6 @@ export default function TimeClock({ employeeId, onUpdate }: Props) {
     onUpdate?.();
   };
 
-  // Current segment = last entry's timestamp → now
   const lastEntry = status.todayEntries.length > 0
     ? status.todayEntries[status.todayEntries.length - 1]
     : null;
@@ -121,7 +122,6 @@ export default function TimeClock({ employeeId, onUpdate }: Props) {
   const mins = Math.floor((currentSegmentElapsed % 3600) / 60);
   const secs = currentSegmentElapsed % 60;
 
-  // What are we currently timing?
   const timingLabel = status.isOnLunch ? 'TIMING LUNCH' : status.isOnBreak ? 'TIMING BREAK' : status.isClockedIn ? 'TIMING WORK SESSION' : 'OFF CLOCK';
   const timerColor = status.isOnLunch
     ? 'text-amber-500'
@@ -138,23 +138,31 @@ export default function TimeClock({ employeeId, onUpdate }: Props) {
         ? 'bg-emerald-500/10'
         : 'bg-muted/30';
 
-  // Compute segments for today's log
   const segments = useMemo(() => deriveSegments(status.todayEntries), [status.todayEntries]);
 
-  // Total work time accumulator (only 'work' segments with completed durations)
-  const totalWorkMs = useMemo(() => {
-    let total = 0;
+  // Totals by type (completed segments only)
+  const totals = useMemo(() => {
+    let workMs = 0, breakMs = 0, lunchMs = 0;
     for (const seg of segments) {
-      if (seg.type === 'work' && seg.end && seg.action !== 'clock_out') {
-        total += seg.durationMs;
+      if (seg.end && seg.action !== 'clock_out') {
+        if (seg.type === 'work') workMs += seg.durationMs;
+        else if (seg.type === 'break') breakMs += seg.durationMs;
+        else if (seg.type === 'lunch') lunchMs += seg.durationMs;
       }
     }
-    // Add current live work segment if actively working (not on lunch/break)
-    if (status.isClockedIn && !status.isOnLunch && !status.isOnBreak && lastEntry) {
-      total += currentSegmentElapsed * 1000;
+    // Add live segment
+    if (status.isClockedIn && lastEntry) {
+      const liveMs = currentSegmentElapsed * 1000;
+      if (status.isOnLunch) lunchMs += liveMs;
+      else if (status.isOnBreak) breakMs += liveMs;
+      else workMs += liveMs;
     }
-    return total;
+    const paidMs = workMs + breakMs;
+    return { workMs, breakMs, lunchMs, paidMs };
   }, [segments, status.isClockedIn, status.isOnLunch, status.isOnBreak, currentSegmentElapsed, lastEntry]);
+
+  const goalMs = dailyGoalHours * 3600 * 1000;
+  const progressPercent = Math.min(100, (totals.paidMs / goalMs) * 100);
 
   const statusLabel = status.isOnLunch ? 'On Lunch' : status.isOnBreak ? 'On Break' : status.isClockedIn ? 'Working' : 'Off Clock';
   const statusColor = status.isOnLunch ? 'text-amber-500' : status.isOnBreak ? 'text-blue-400' : status.isClockedIn ? 'text-emerald-500' : 'text-muted-foreground';
@@ -181,8 +189,20 @@ export default function TimeClock({ employeeId, onUpdate }: Props) {
             {String(hours).padStart(2, '0')}:{String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
           </p>
           <p className="text-xs text-muted-foreground mt-2">
-            Total Work: <span className="font-mono font-semibold text-foreground">{formatDurationMs(totalWorkMs)}</span>
+            Total Paid Time: <span className="font-mono font-bold text-foreground">{formatDurationMs(totals.paidMs)}</span>
           </p>
+        </div>
+      )}
+
+      {/* Daily Progress Bar */}
+      {status.isClockedIn && (
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Daily Progress</span>
+            <span className="font-mono font-semibold text-foreground">{formatDurationMs(totals.paidMs)} / {dailyGoalHours}h</span>
+          </div>
+          <Progress value={progressPercent} className="h-2.5" />
+          <p className="text-[10px] text-muted-foreground text-right">{progressPercent.toFixed(0)}% of {dailyGoalHours}h goal</p>
         </div>
       )}
 
@@ -247,6 +267,35 @@ export default function TimeClock({ employeeId, onUpdate }: Props) {
                 </div>
               );
             })}
+          </div>
+
+          {/* Daily Total Summary */}
+          <div className="mt-3 pt-3 border-t border-border space-y-1.5">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Daily Totals</p>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-md bg-emerald-500/10 p-2">
+                <p className="text-[10px] uppercase tracking-wider text-emerald-500 font-medium">Work</p>
+                <p className="font-mono font-bold text-sm text-emerald-500">{formatDurationMs(totals.workMs)}</p>
+              </div>
+              <div className="rounded-md bg-blue-400/10 p-2">
+                <p className="text-[10px] uppercase tracking-wider text-blue-400 font-medium">Breaks</p>
+                <p className="font-mono font-bold text-sm text-blue-400">{formatDurationMs(totals.breakMs)}</p>
+              </div>
+              <div className="rounded-md bg-amber-500/10 p-2">
+                <p className="text-[10px] uppercase tracking-wider text-amber-500 font-medium">Lunch</p>
+                <p className="font-mono font-bold text-sm text-amber-500">{formatDurationMs(totals.lunchMs)}</p>
+              </div>
+            </div>
+            <div className="flex justify-between items-center pt-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Paid Time <span className="text-emerald-500">(Work + Breaks)</span></p>
+              </div>
+              <p className="font-mono font-bold text-lg text-foreground">{formatDurationMs(totals.paidMs)}</p>
+            </div>
+            <div className="flex justify-between items-center">
+              <p className="text-xs text-muted-foreground">Unpaid Time <span className="text-amber-500">(Lunch)</span></p>
+              <p className="font-mono font-semibold text-sm text-amber-500">{formatDurationMs(totals.lunchMs)}</p>
+            </div>
           </div>
         </div>
       )}

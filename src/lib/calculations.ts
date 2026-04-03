@@ -42,6 +42,7 @@ export function calculateDailySummary(entries: TimeEntry[], employeeId: string, 
     totalMinutes = (new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 60000;
   }
 
+  // Net work = total - lunch (breaks are PAID, so not subtracted)
   const netWorkMinutes = Math.max(0, totalMinutes - lunchMinutes);
 
   return {
