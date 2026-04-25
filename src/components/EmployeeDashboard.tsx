@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Employee } from '@/types/workforce';
+import { formatDate, formatCurrency } from '@/lib/calculations';
 import TimeClock from '@/components/TimeClock';
 import LeaveBalanceCard from '@/components/LeaveBalanceCard';
 import LeaveRequestForm from '@/components/LeaveRequestForm';
@@ -7,18 +8,18 @@ import PayrollEstimate from '@/components/PayrollEstimate';
 import LeaveHistory from '@/components/LeaveHistory';
 import LeaveAnalytics from '@/components/LeaveAnalytics';
 import { User, Briefcase, Mail, CalendarDays } from 'lucide-react';
-import { formatDate, formatCurrency } from '@/lib/calculations';
 
 interface Props {
   employee: Employee;
+  onEmployeeUpdate?: () => void;
 }
 
-export default function EmployeeDashboard({ employee }: Props) {
+export default function EmployeeDashboard({ employee, onEmployeeUpdate }: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
-  const refresh = () => setRefreshKey(k => k + 1);
+  const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
 
   return (
-    <div className="space-y-6 animate-fade-in" key={refreshKey}>
+    <div className="space-y-6 animate-fade-in">
       {/* Profile header */}
       <div className="stat-card flex items-center gap-4">
         <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
@@ -38,8 +39,8 @@ export default function EmployeeDashboard({ employee }: Props) {
         </div>
       </div>
 
-      {/* Analytics full width */}
-      <LeaveAnalytics employee={employee} />
+      {/* Analytics - re-reads on refresh */}
+      <LeaveAnalytics key={`analytics-${refreshKey}`} employee={employee} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
@@ -47,9 +48,9 @@ export default function EmployeeDashboard({ employee }: Props) {
           <LeaveRequestForm employee={employee} onSubmit={refresh} />
         </div>
         <div className="space-y-6">
-          <PayrollEstimate employee={employee} />
-          <LeaveBalanceCard employee={employee} />
-          <LeaveHistory employee={employee} />
+          <PayrollEstimate key={`payroll-${refreshKey}`} employee={employee} />
+          <LeaveBalanceCard key={`balance-${refreshKey}`} employee={employee} />
+          <LeaveHistory key={`history-${refreshKey}`} employee={employee} />
         </div>
       </div>
     </div>

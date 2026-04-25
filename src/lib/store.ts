@@ -1,143 +1,140 @@
+import { supabase } from '@/lib/supabase';
 import { Employee, TimeEntry, LeaveRequest, MedicalProof } from '@/types/workforce';
 
-const KEYS = {
-  employees: 'wms_employees',
-  timeEntries: 'wms_time_entries',
-  leaveRequests: 'wms_leave_requests',
-  currentUser: 'wms_current_user',
-  medicalProofs: 'wms_medical_proofs',
-};
-
-function load<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+function toEmployee(r: Record<string, unknown>): Employee {
+  return {
+    id: r.id as string, name: r.name as string, email: r.email as string,
+    role: r.role as 'employee' | 'admin', hourlyRate: Number(r.hourly_rate),
+    vacationAccrualRate: Number(r.vacation_accrual_rate),
+    paidPtoLimitHours: Number(r.paid_pto_limit_hours),
+    hireDate: r.hire_date as string, department: r.department as string,
+    avatarUrl: r.avatar_url as string | undefined,
+  };
+}
+function toTimeEntry(r: Record<string, unknown>): TimeEntry {
+  return {
+    id: r.id as string, employeeId: r.employee_id as string,
+    action: r.action as TimeEntry['action'], timestamp: r.timestamp as string, date: r.date as string,
+  };
+}
+function toLeaveRequest(r: Record<string, unknown>): LeaveRequest {
+  return {
+    id: r.id as string, employeeId: r.employee_id as string,
+    category: r.category as LeaveRequest['category'],
+    startDate: r.start_date as string, endDate: r.end_date as string,
+    hours: Number(r.hours), isPaid: r.is_paid as boolean,
+    unpaidHours: Number(r.unpaid_hours), status: r.status as LeaveRequest['status'],
+    reason: (r.reason as string) ?? '', usesPtoBalance: r.uses_pto_balance as boolean | undefined,
+    createdAt: r.created_at as string,
+  };
+}
+function toMedicalProof(r: Record<string, unknown>): MedicalProof {
+  return {
+    id: r.id as string, leaveRequestId: r.leave_request_id as string,
+    fileName: r.file_name as string, fileData: r.file_data as string,
+    uploadedAt: r.uploaded_at as string,
+  };
 }
 
-function save<T>(key: string, data: T): void {
-  localStorage.setItem(key, JSON.stringify(data));
+export async function getEmployees(): Promise<Employee[]> {
+  const { data, error } = await supabase.from('employees').select('*').order('created_at');
+  if (error) throw error;
+  return (data ?? []).map(toEmployee);
+}
+export async function addEmployee(emp: Omit<Employee, 'id'> & { id?: string }): Promise<Employee> {
+  const row: Record<string, unknown> = {
+    name: emp.name, email: emp.email, role: emp.role, hourly_rate: emp.hourlyRate,
+    vacation_accrual_rate: emp.vacationAccrualRate, paid_pto_limit_hours: emp.paidPtoLimitHours,
+    hire_date: emp.hireDate, department: emp.department, avatar_url: emp.avatarUrl ?? null,
+  };
+  if (emp.id) row.id = emp.id;
+  const { data, error } = await supabase.from('employees').insert(row).select().single();
+  if (error) throw error;
+  return toEmployee(data);
+}
+export async function updateEmployee(id: string, updates: Partial<Employee>): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (updates.name !== undefined) row.name = updates.name;
+  if (updates.email !== undefined) row.email = updates.email;
+  if (updates.role !== undefined) row.role = updates.role;
+  if (updates.hourlyRate !== undefined) row.hourly_rate = updates.hourlyRate;
+  if (updates.vacationAccrualRate !== undefined) row.vacation_accrual_rate = updates.vacationAccrualRate;
+  if (updates.paidPtoLimitHours !== undefined) row.paid_pto_limit_hours = updates.paidPtoLimitHours;
+  if (updates.hireDate !== undefined) row.hire_date = updates.hireDate;
+  if (updates.department !== undefined) row.department = updates.department;
+  const { error } = await supabase.from('employees').update(row).eq('id', id);
+  if (error) throw error;
 }
 
-// Seed data
-const seedEmployees: Employee[] = [
-  {
-    id: 'emp-001',
-    name: 'María García',
-    email: 'maria@freelancela.com',
-    role: 'employee',
-    hourlyRate: 35.0,
-    vacationAccrualRate: 0.416,
-    paidPtoLimitHours: 40,
-    hireDate: '2024-03-15',
-    department: 'Engineering',
-  },
-  {
-    id: 'emp-002',
-    name: 'Carlos Mendez',
-    email: 'carlos@freelancela.com',
-    role: 'employee',
-    hourlyRate: 42.5,
-    vacationAccrualRate: 0.416,
-    paidPtoLimitHours: 40,
-    hireDate: '2023-08-01',
-    department: 'Design',
-  },
-  {
-    id: 'admin-001',
-    name: 'Ana Torres',
-    email: 'ana@freelancela.com',
-    role: 'admin',
-    hourlyRate: 55.0,
-    vacationAccrualRate: 0.416,
-    paidPtoLimitHours: 40,
-    hireDate: '2022-01-10',
-    department: 'Management',
-  },
-];
-
-export function initializeStore(): void {
-  if (!localStorage.getItem(KEYS.employees)) {
-    save(KEYS.employees, seedEmployees);
-  }
-  if (!localStorage.getItem(KEYS.timeEntries)) {
-    save(KEYS.timeEntries, []);
-  }
-  if (!localStorage.getItem(KEYS.leaveRequests)) {
-    save(KEYS.leaveRequests, []);
-  }
-  if (!localStorage.getItem(KEYS.currentUser)) {
-    save(KEYS.currentUser, seedEmployees[0].id);
-  }
+export async function getTimeEntries(employeeId?: string): Promise<TimeEntry[]> {
+  let q = supabase.from('time_entries').select('*').order('timestamp');
+  if (employeeId) q = q.eq('employee_id', employeeId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(toTimeEntry);
+}
+export async function addTimeEntry(entry: Omit<TimeEntry, 'id'> & { id?: string }): Promise<TimeEntry> {
+  const row: Record<string, unknown> = {
+    employee_id: entry.employeeId, action: entry.action,
+    timestamp: entry.timestamp, date: entry.date,
+  };
+  if (entry.id) row.id = entry.id;
+  const { data, error } = await supabase.from('time_entries').insert(row).select().single();
+  if (error) throw error;
+  return toTimeEntry(data);
 }
 
-export const store = {
-  getEmployees: (): Employee[] => load(KEYS.employees, seedEmployees),
-  saveEmployees: (data: Employee[]) => save(KEYS.employees, data),
+export async function getLeaveRequests(employeeId?: string): Promise<LeaveRequest[]> {
+  let q = supabase.from('leave_requests').select('*').order('created_at', { ascending: false });
+  if (employeeId) q = q.eq('employee_id', employeeId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(toLeaveRequest);
+}
+export async function addLeaveRequest(req: LeaveRequest): Promise<LeaveRequest> {
+  const { data, error } = await supabase.from('leave_requests').insert({
+    id: req.id, employee_id: req.employeeId, category: req.category,
+    start_date: req.startDate, end_date: req.endDate, hours: req.hours,
+    is_paid: req.isPaid, unpaid_hours: req.unpaidHours, status: req.status,
+    reason: req.reason ?? null, uses_pto_balance: req.usesPtoBalance ?? null,
+  }).select().single();
+  if (error) throw error;
+  return toLeaveRequest(data);
+}
+export async function updateLeaveRequest(id: string, updates: Partial<LeaveRequest>): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (updates.status !== undefined) row.status = updates.status;
+  if (updates.isPaid !== undefined) row.is_paid = updates.isPaid;
+  if (updates.unpaidHours !== undefined) row.unpaid_hours = updates.unpaidHours;
+  if (updates.reason !== undefined) row.reason = updates.reason;
+  if (updates.usesPtoBalance !== undefined) row.uses_pto_balance = updates.usesPtoBalance;
+  const { error } = await supabase.from('leave_requests').update(row).eq('id', id);
+  if (error) throw error;
+}
 
-  getTimeEntries: (): TimeEntry[] => load(KEYS.timeEntries, []),
-  saveTimeEntries: (data: TimeEntry[]) => save(KEYS.timeEntries, data),
-  addTimeEntry: (entry: TimeEntry) => {
-    const entries = store.getTimeEntries();
-    entries.push(entry);
-    save(KEYS.timeEntries, entries);
-  },
-
-  getLeaveRequests: (): LeaveRequest[] => load(KEYS.leaveRequests, []),
-  saveLeaveRequests: (data: LeaveRequest[]) => save(KEYS.leaveRequests, data),
-  addLeaveRequest: (request: LeaveRequest) => {
-    const requests = store.getLeaveRequests();
-    requests.push(request);
-    save(KEYS.leaveRequests, requests);
-  },
-  updateLeaveRequest: (id: string, updates: Partial<LeaveRequest>) => {
-    const requests = store.getLeaveRequests();
-    const idx = requests.findIndex(r => r.id === id);
-    if (idx >= 0) {
-      requests[idx] = { ...requests[idx], ...updates };
-      save(KEYS.leaveRequests, requests);
-    }
-  },
-
-  getCurrentUserId: (): string => load(KEYS.currentUser, 'emp-001'),
-  setCurrentUserId: (id: string) => save(KEYS.currentUser, id),
-
-  addEmployee: (emp: Employee) => {
-    const employees = store.getEmployees();
-    employees.push(emp);
-    save(KEYS.employees, employees);
-  },
-  updateEmployee: (id: string, updates: Partial<Employee>) => {
-    const employees = store.getEmployees();
-    const idx = employees.findIndex(e => e.id === id);
-    if (idx >= 0) {
-      employees[idx] = { ...employees[idx], ...updates };
-      save(KEYS.employees, employees);
-    }
-  },
-
-  // Medical Proofs
-  getMedicalProofs: (): MedicalProof[] => load(KEYS.medicalProofs, []),
-  addMedicalProof: (proof: MedicalProof) => {
-    const proofs = store.getMedicalProofs();
-    proofs.push(proof);
-    save(KEYS.medicalProofs, proofs);
-  },
-  updateMedicalProof: (id: string, updates: Partial<MedicalProof>) => {
-    const proofs = store.getMedicalProofs();
-    const idx = proofs.findIndex(p => p.id === id);
-    if (idx >= 0) {
-      proofs[idx] = { ...proofs[idx], ...updates };
-      save(KEYS.medicalProofs, proofs);
-    }
-  },
-  deleteMedicalProof: (id: string) => {
-    const proofs = store.getMedicalProofs().filter(p => p.id !== id);
-    save(KEYS.medicalProofs, proofs);
-  },
-  getMedicalProofsForRequest: (leaveRequestId: string): MedicalProof[] => {
-    return store.getMedicalProofs().filter(p => p.leaveRequestId === leaveRequestId);
-  },
-};
+export async function getMedicalProofs(leaveRequestId: string): Promise<MedicalProof[]> {
+  const { data, error } = await supabase.from('medical_proofs').select('*')
+    .eq('leave_request_id', leaveRequestId).order('uploaded_at');
+  if (error) throw error;
+  return (data ?? []).map(toMedicalProof);
+}
+export async function addMedicalProof(proof: MedicalProof): Promise<MedicalProof> {
+  const { data, error } = await supabase.from('medical_proofs').insert({
+    id: proof.id, leave_request_id: proof.leaveRequestId,
+    file_name: proof.fileName, file_data: proof.fileData, uploaded_at: proof.uploadedAt,
+  }).select().single();
+  if (error) throw error;
+  return toMedicalProof(data);
+}
+export async function updateMedicalProof(id: string, updates: Partial<MedicalProof>): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (updates.fileName !== undefined) row.file_name = updates.fileName;
+  if (updates.fileData !== undefined) row.file_data = updates.fileData;
+  if (updates.uploadedAt !== undefined) row.uploaded_at = updates.uploadedAt;
+  const { error } = await supabase.from('medical_proofs').update(row).eq('id', id);
+  if (error) throw error;
+}
+export async function deleteMedicalProof(id: string): Promise<void> {
+  const { error } = await supabase.from('medical_proofs').delete().eq('id', id);
+  if (error) throw error;
+}
