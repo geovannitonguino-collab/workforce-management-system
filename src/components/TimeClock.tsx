@@ -173,12 +173,18 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2 text-center pt-2">
-            {[['Work', totals.workMs, 'emerald'], ['Breaks', totals.breakMs, 'blue'], ['Lunch', totals.lunchMs, 'amber']].map(([l, ms, c]) => (
-              <div key={l as string} className={`rounded-md bg-${c}-500/10 p-2`}>
-                <p className={`text-[10px] uppercase tracking-wider text-${c}-500 font-medium`}>{l}</p>
-                <p className={`font-mono font-bold text-sm text-${c}-500`}>{formatMs(ms as number)}</p>
-              </div>
-            ))}
+            <div className="rounded-md bg-emerald-500/10 p-2">
+              <p className="text-[10px] uppercase tracking-wider text-emerald-500 font-medium">Work</p>
+              <p className="font-mono font-bold text-sm text-emerald-500">{formatMs(totals.workMs)}</p>
+            </div>
+            <div className="rounded-md bg-blue-400/10 p-2">
+              <p className="text-[10px] uppercase tracking-wider text-blue-400 font-medium">Breaks</p>
+              <p className="font-mono font-bold text-sm text-blue-400">{formatMs(totals.breakMs)}</p>
+            </div>
+            <div className="rounded-md bg-amber-500/10 p-2">
+              <p className="text-[10px] uppercase tracking-wider text-amber-500 font-medium">Lunch</p>
+              <p className="font-mono font-bold text-sm text-amber-500">{formatMs(totals.lunchMs)}</p>
+            </div>
           </div>
         </div>
       )}
