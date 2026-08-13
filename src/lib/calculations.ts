@@ -10,16 +10,22 @@ export function calculateDailySummary(entries: TimeEntry[], employeeId: string, 
 
   let clockIn: string | undefined;
   let clockOut: string | undefined;
+  let workStart: number | null = null;
   let lunchStart: number | null = null;
   let breakStart: number | null = null;
+  let totalWorkMs = 0;
   let totalLunchMs = 0;
   let totalBreakMs = 0;
 
   for (const entry of dayEntries) {
     const ts = new Date(entry.timestamp).getTime();
     switch (entry.action) {
-      case 'clock_in':    clockIn = entry.timestamp; break;
-      case 'clock_out':   clockOut = entry.timestamp; break;
+      case 'clock_in':
+        if (workStart === null) { workStart = ts; clockIn = clockIn ?? entry.timestamp; }
+        break;
+      case 'clock_out':
+        if (workStart !== null) { totalWorkMs += ts - workStart; workStart = null; clockOut = entry.timestamp; }
+        break;
       case 'start_lunch': lunchStart = ts; break;
       case 'end_lunch':   if (lunchStart !== null) { totalLunchMs += ts - lunchStart; lunchStart = null; } break;
       case 'start_break': breakStart = ts; break;
@@ -30,11 +36,8 @@ export function calculateDailySummary(entries: TimeEntry[], employeeId: string, 
   const lunchMinutes = totalLunchMs / 60000;
   const breakMinutes = totalBreakMs / 60000;
 
-  let totalMinutes = 0;
-  if (clockIn && clockOut) {
-    const raw = (new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 60000;
-    totalMinutes = Math.max(0, raw - lunchMinutes);
-  }
+  const rawWorkMinutes = totalWorkMs / 60000;
+  const totalMinutes = Math.max(0, rawWorkMinutes - lunchMinutes);
 
   const netWorkMinutes = totalMinutes;
   const netWorkHours = minutesToHours(netWorkMinutes);
@@ -52,12 +55,16 @@ export function getCurrentPeriod(): string {
 }
 
 // Bug fix #8: parse YYYY-MM-DD as LOCAL date to avoid timezone shift (e.g. Colombia GMT-5)
-export function formatDate(iso: string): string {
+export function parseLocalDate(iso: string): Date {
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
     const [y, m, d] = iso.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(y, m - 1, d);
   }
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return new Date(iso);
+}
+
+export function formatDate(iso: string): string {
+  return parseLocalDate(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export function formatTime(iso: string): string {
@@ -74,7 +81,8 @@ export function formatHours(hours: number): string {
 
 // Bug fix #7: normalize to start of month to avoid counting partial months
 export function calculateLeaveBalance(employee: Employee, leaveRequests: LeaveRequest[], year: number): LeaveBalance {
-  const hireDate = new Date(employee.hireDate);
+  // Bug fix #6: parse hireDate as LOCAL date (same parser as formatDate) to avoid timezone shift
+  const hireDate = parseLocalDate(employee.hireDate);
   const now = new Date();
   const hireMonth = new Date(hireDate.getFullYear(), hireDate.getMonth(), 1);
   const nowMonth  = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -150,8 +158,11 @@ export function calculatePayroll(
   const totalWorkHours = round4(dailySummaries.reduce((s, d) => s + d.netWorkHours, 0));
   const grossPay = round4(totalWorkHours * employee.hourlyRate);
 
+  // Bug fix #4: count a leave request only in the period of its startDate. Using
+  // startDate OR endDate double-counted requests that cross a month boundary
+  // (e.g. Jan 31 - Feb 2 would appear in both January's and February's payroll).
   const periodLeaves = leaveRequests.filter(
-    r => r.status === 'approved' && (r.startDate.startsWith(period) || r.endDate.startsWith(period))
+    r => r.status === 'approved' && r.startDate.startsWith(period)
   );
 
   const paidLeaveHours = round4(periodLeaves.filter(r => r.isPaid).reduce((s, r) => s + (r.hours - r.unpaidHours), 0));
