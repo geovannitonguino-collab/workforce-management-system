@@ -23,7 +23,7 @@ export default function MedicalProofManager({ leaveRequestId, onUpdate }: Props)
     onUpdate?.();
   };
 
-  useEffect(() => { refresh(); }, [leaveRequestId]);
+  useEffect(() => { refresh(); }, [leaveRequestId, onUpdate]);
 
   const readFile = (file: File): Promise<string> =>
     new Promise((res, rej) => {

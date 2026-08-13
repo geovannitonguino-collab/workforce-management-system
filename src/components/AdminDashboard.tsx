@@ -277,6 +277,18 @@ function EditEmployeeDialog({ employee, onSave }: { employee: Employee; onSave: 
     hourlyRate: String(employee.hourlyRate), paidPtoLimitHours: String(employee.paidPtoLimitHours),
     vacationAccrualRate: String(employee.vacationAccrualRate), department: employee.department,
   });
+
+  // Bug fix #7: reset form state whenever the dialog opens (or the employee prop
+  // changes while open). The dialog wrapper never unmounts on close, so without this
+  // reopening it kept showing whatever was last typed (including unsaved edits).
+  useEffect(() => {
+    if (!open) return;
+    setF({
+      hourlyRate: String(employee.hourlyRate), paidPtoLimitHours: String(employee.paidPtoLimitHours),
+      vacationAccrualRate: String(employee.vacationAccrualRate), department: employee.department,
+    });
+  }, [open, employee]);
+
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setF(prev => ({ ...prev, [k]: e.target.value }));
 
   const submit = async () => {

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Employee, LeaveCategory, LeaveRequest, LeaveBalance } from '@/types/workforce';
 import { getLeaveRequests, addLeaveRequest, getMedicalProofs } from '@/lib/store';
-import { calculateLeaveBalance, calculateLeaveRequestPaidStatus, canRequestVacation } from '@/lib/calculations';
+import { calculateLeaveBalance, calculateLeaveRequestPaidStatus, canRequestVacation, parseLocalDate } from '@/lib/calculations';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,20 @@ import MedicalProofManager from '@/components/MedicalProofManager';
 import { CalendarPlus, AlertTriangle, ShieldAlert, Info, Stethoscope, Loader2 } from 'lucide-react';
 
 interface Props { employee: Employee; onSubmit?: () => void; }
+
+// Bug fix #5: count Mon-Fri business days between two YYYY-MM-DD dates, inclusive
+function countBusinessDays(start: string, end: string): number {
+  const s = parseLocalDate(start);
+  const e = parseLocalDate(end);
+  let count = 0;
+  const cur = new Date(s);
+  while (cur <= e) {
+    const day = cur.getDay();
+    if (day !== 0 && day !== 6) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}
 
 export default function LeaveRequestForm({ employee, onSubmit }: Props) {
   const [category, setCategory] = useState<LeaveCategory>('pto');
@@ -44,15 +58,24 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
   const vacationError = balance && category === 'vacation' && hoursNum > 0 && !canRequestVacation(balance, requestedDays)
     ? `Insufficient vacation balance. You have ${balance.remainingVacationDays.toFixed(2)} days available.` : null;
 
+  // Bug fix #5: end date cannot be before start date
+  const dateError = startDate && endDate && endDate < startDate ? 'End date cannot be before start date.' : null;
+
+  // Bug fix #5: non-blocking heads-up when hours don't match business days in range
+  const businessDays = startDate && endDate && !dateError ? countBusinessDays(startDate, endDate) : 0;
+  const expectedHours = businessDays * 8;
+  const hoursMismatch = businessDays > 0 && hoursNum > 0 && hoursNum !== expectedHours;
+
   const preview = balance && hoursNum > 0 && !vacationError
     ? calculateLeaveRequestPaidStatus({ category, hours: hoursNum, usesPtoBalance }, balance) : null;
 
-  const canSubmit = startDate && endDate && hoursNum > 0 && !vacationError && !sickProofRequired && !saving && balance;
+  const canSubmit = startDate && endDate && !dateError && hoursNum > 0 && !vacationError && !sickProofRequired && !saving && balance;
 
-  const handleProofUpdate = async () => {
+  // Bug fix #8: memoized so MedicalProofManager's effect (which depends on onUpdate) doesn't re-run every render
+  const handleProofUpdate = useCallback(async () => {
     const proofs = await getMedicalProofs(draftId);
     setProofsUploaded(proofs.length);
-  };
+  }, [draftId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,10 +164,23 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
           <div><Label>End Date</Label><Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></div>
         </div>
 
+        {dateError && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+            <p className="text-sm text-destructive font-medium">{dateError}</p>
+          </div>
+        )}
+
         <div>
           <Label>Hours</Label>
           <Input type="number" step="0.5" min="0.5" value={hours} onChange={e => setHours(e.target.value)} placeholder="e.g. 8 (1 day = 8h)" />
           {hoursNum > 0 && <p className="text-xs text-muted-foreground mt-1">{requestedDays.toFixed(1)} day(s)</p>}
+          {hoursMismatch && (
+            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+              <Info className="h-3 w-3 shrink-0" />
+              Heads up: the selected range has {businessDays} business day(s) (~{expectedHours}h), but you entered {hoursNum}h. This is just a note — half days and partial requests are fine.
+            </p>
+          )}
         </div>
 
         {category === 'personal' && (
