@@ -34,6 +34,13 @@ export default function Index() {
   }, []);
 
   const currentEmployee = employees.find(e => e.id === currentUserId);
+  const isAdmin = currentEmployee?.role === 'admin';
+
+  useEffect(() => {
+    if (view === 'admin' && !isAdmin) {
+      setView('employee');
+    }
+  }, [isAdmin, view]);
 
   const switchUser = (id: string) => {
     setCurrentUserId(id);
@@ -59,9 +66,11 @@ export default function Index() {
             <Button variant={view === 'employee' ? 'default' : 'ghost'} size="sm" onClick={() => setView('employee')}>
               <User className="h-4 w-4" /> Employee
             </Button>
-            <Button variant={view === 'admin' ? 'default' : 'ghost'} size="sm" onClick={() => setView('admin')}>
-              <LayoutDashboard className="h-4 w-4" /> Admin
-            </Button>
+            {isAdmin && (
+              <Button variant={view === 'admin' ? 'default' : 'ghost'} size="sm" onClick={() => setView('admin')}>
+                <LayoutDashboard className="h-4 w-4" /> Admin
+              </Button>
+            )}
           </div>
 
           <Select value={currentUserId} onValueChange={switchUser} disabled={loading}>
