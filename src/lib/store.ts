@@ -5,6 +5,7 @@ function toEmployee(r: Record<string, unknown>): Employee {
   return {
     id: r.id as string, name: r.name as string, email: r.email as string,
     userId: (r.user_id as string | null) ?? undefined,
+    termsVersion: (r.terms_version as string | null) ?? undefined,
     role: r.role as 'employee' | 'admin', hourlyRate: Number(r.hourly_rate),
     vacationAccrualRate: Number(r.vacation_accrual_rate),
     paidPtoLimitHours: Number(r.paid_pto_limit_hours),
@@ -221,4 +222,9 @@ export async function getAuditLog(limit = 50): Promise<AuditEvent[]> {
     entity: r.entity as string, entityId: (r.entity_id as string | null) ?? undefined,
     details: (r.details ?? {}) as Record<string, unknown>, createdAt: r.created_at as string,
   }));
+}
+
+export async function acceptTerms(version: string): Promise<void> {
+  const { error } = await supabase.rpc('accept_terms', { p_version: version });
+  if (error) throw error;
 }

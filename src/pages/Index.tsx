@@ -5,6 +5,8 @@ import EmployeeDashboard from '@/components/EmployeeDashboard';
 import AdminDashboard from '@/components/AdminDashboard';
 import { useAuth } from '@/lib/auth';
 import Login from '@/pages/Login';
+import TermsGate from '@/components/TermsGate';
+import { TERMS_VERSION } from '@/lib/legal';
 import { Button } from '@/components/ui/button';
 import { User, Loader2, LayoutDashboard, LogOut } from 'lucide-react';
 import geovannixLogo from '@/assets/geovannix-logo.png';
@@ -87,6 +89,11 @@ export default function Index() {
           <div className="flex items-center justify-center py-32">
             <p className="text-destructive">{error}</p>
           </div>
+        ) : currentEmployee && currentEmployee.termsVersion !== TERMS_VERSION ? (
+          <TermsGate
+            onAccepted={async () => setEmployees(await getEmployees())}
+            onSignOut={signOut}
+          />
         ) : view === 'employee' && currentEmployee ? (
           <EmployeeDashboard employee={currentEmployee} onEmployeeUpdate={async () => setEmployees(await getEmployees())} />
         ) : view === 'admin' ? (

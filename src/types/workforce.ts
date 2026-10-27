@@ -3,6 +3,7 @@ export interface Employee {
   name: string;
   email: string;
   userId?: string; // linked Supabase Auth user
+  termsVersion?: string; // last accepted Terms/Privacy version
   role: 'employee' | 'admin';
   hourlyRate: number;
   vacationAccrualRate: number; // fixed at 0.416 days/month
