@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MedicalProof } from '@/types/workforce';
-import { getMedicalProofs, addMedicalProof, updateMedicalProof, deleteMedicalProof } from '@/lib/store';
+import { getMedicalProofs, addMedicalProof, replaceMedicalProof, deleteMedicalProof, getMedicalProofUrl } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/calculations';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -25,14 +25,6 @@ export default function MedicalProofManager({ leaveRequestId, onUpdate }: Props)
 
   useEffect(() => { refresh(); }, [leaveRequestId, onUpdate]);
 
-  const readFile = (file: File): Promise<string> =>
-    new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result as string);
-      r.onerror = () => rej(new Error('Read failed'));
-      r.readAsDataURL(file);
-    });
-
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -40,9 +32,10 @@ export default function MedicalProofManager({ leaveRequestId, onUpdate }: Props)
     if (file.size > 5 * 1024 * 1024) { alert('Max 5MB.'); return; }
     setUploading(true);
     try {
-      const data = await readFile(file);
-      await addMedicalProof({ id: crypto.randomUUID(), leaveRequestId, fileName: file.name, fileData: data, uploadedAt: new Date().toISOString() });
+      await addMedicalProof(leaveRequestId, file);
       await refresh();
+    } catch {
+      alert('Upload failed. Please try again.');
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -55,10 +48,13 @@ export default function MedicalProofManager({ leaveRequestId, onUpdate }: Props)
     if (file.type !== 'application/pdf') { alert('PDF files only.'); return; }
     setUploading(true);
     try {
-      const data = await readFile(file);
-      await updateMedicalProof(proofId, { fileName: file.name, fileData: data, uploadedAt: new Date().toISOString() });
+      const proof = proofs.find(p => p.id === proofId);
+      if (!proof) return;
+      await replaceMedicalProof(proof, file);
       setEditingId(null);
       await refresh();
+    } catch {
+      alert('Upload failed. Please try again.');
     } finally {
       setUploading(false);
       if (replaceRef.current) replaceRef.current.value = '';
@@ -67,7 +63,8 @@ export default function MedicalProofManager({ leaveRequestId, onUpdate }: Props)
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
-    await deleteMedicalProof(deleteTarget);
+    const proof = proofs.find(p => p.id === deleteTarget);
+    if (proof) await deleteMedicalProof(proof);
     setDeleteTarget(null);
     await refresh();
   };
@@ -95,7 +92,7 @@ export default function MedicalProofManager({ leaveRequestId, onUpdate }: Props)
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreviewUrl(proof.fileData)}>
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { try { setPreviewUrl(await getMedicalProofUrl(proof)); } catch { alert('Could not open file.'); } }}>
                   <Eye className="h-3.5 w-3.5" />
                 </Button>
                 {editingId === proof.id ? (

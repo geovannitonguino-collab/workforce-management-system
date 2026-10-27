@@ -2,6 +2,7 @@ export interface Employee {
   id: string;
   name: string;
   email: string;
+  userId?: string; // linked Supabase Auth user
   role: 'employee' | 'admin';
   hourlyRate: number;
   vacationAccrualRate: number; // fixed at 0.416 days/month
@@ -39,7 +40,8 @@ export interface MedicalProof {
   id: string;
   leaveRequestId: string;
   fileName: string;
-  fileData: string; // base64
+  storagePath?: string; // private Storage object path
+  fileData?: string; // legacy base64 (pre-Storage rows)
   uploadedAt: string;
 }
 

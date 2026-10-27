@@ -4,6 +4,7 @@ import { Employee, TimeEntry, LeaveRequest, MedicalProof } from '@/types/workfor
 function toEmployee(r: Record<string, unknown>): Employee {
   return {
     id: r.id as string, name: r.name as string, email: r.email as string,
+    userId: (r.user_id as string | null) ?? undefined,
     role: r.role as 'employee' | 'admin', hourlyRate: Number(r.hourly_rate),
     vacationAccrualRate: Number(r.vacation_accrual_rate),
     paidPtoLimitHours: Number(r.paid_pto_limit_hours),
@@ -31,7 +32,8 @@ function toLeaveRequest(r: Record<string, unknown>): LeaveRequest {
 function toMedicalProof(r: Record<string, unknown>): MedicalProof {
   return {
     id: r.id as string, leaveRequestId: r.leave_request_id as string,
-    fileName: r.file_name as string, fileData: r.file_data as string,
+    fileName: r.file_name as string, storagePath: (r.storage_path as string | null) ?? undefined,
+    fileData: (r.file_data as string | null) ?? undefined,
     uploadedAt: r.uploaded_at as string,
   };
 }
@@ -118,23 +120,56 @@ export async function getMedicalProofs(leaveRequestId: string): Promise<MedicalP
   if (error) throw error;
   return (data ?? []).map(toMedicalProof);
 }
-export async function addMedicalProof(proof: MedicalProof): Promise<MedicalProof> {
-  const { data, error } = await supabase.from('medical_proofs').insert({
-    id: proof.id, leave_request_id: proof.leaveRequestId,
-    file_name: proof.fileName, file_data: proof.fileData, uploaded_at: proof.uploadedAt,
-  }).select().single();
+const PROOF_BUCKET = 'medical-proofs';
+
+async function myEmployeeId(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
+  const { data, error } = await supabase.from('employees').select('id').eq('user_id', user.id).single();
   if (error) throw error;
+  return data.id as string;
+}
+
+async function uploadProofFile(path: string, file: File): Promise<void> {
+  const { error } = await supabase.storage.from(PROOF_BUCKET).upload(path, file, { contentType: 'application/pdf', upsert: true });
+  if (error) throw error;
+}
+
+export async function addMedicalProof(leaveRequestId: string, file: File): Promise<MedicalProof> {
+  const employeeId = await myEmployeeId();
+  const id = crypto.randomUUID();
+  const path = `${employeeId}/${id}.pdf`;
+  await uploadProofFile(path, file);
+  const { data, error } = await supabase.from('medical_proofs').insert({
+    id, employee_id: employeeId, leave_request_id: leaveRequestId,
+    file_name: file.name, storage_path: path, uploaded_at: new Date().toISOString(),
+  }).select().single();
+  if (error) {
+    await supabase.storage.from(PROOF_BUCKET).remove([path]);
+    throw error;
+  }
   return toMedicalProof(data);
 }
-export async function updateMedicalProof(id: string, updates: Partial<MedicalProof>): Promise<void> {
-  const row: Record<string, unknown> = {};
-  if (updates.fileName !== undefined) row.file_name = updates.fileName;
-  if (updates.fileData !== undefined) row.file_data = updates.fileData;
-  if (updates.uploadedAt !== undefined) row.uploaded_at = updates.uploadedAt;
-  const { error } = await supabase.from('medical_proofs').update(row).eq('id', id);
+export async function replaceMedicalProof(proof: MedicalProof, file: File): Promise<void> {
+  const path = proof.storagePath ?? `${await myEmployeeId()}/${proof.id}.pdf`;
+  await uploadProofFile(path, file);
+  const { error } = await supabase.from('medical_proofs').update({
+    file_name: file.name, storage_path: path, file_data: null, uploaded_at: new Date().toISOString(),
+  }).eq('id', proof.id);
   if (error) throw error;
 }
-export async function deleteMedicalProof(id: string): Promise<void> {
-  const { error } = await supabase.from('medical_proofs').delete().eq('id', id);
+export async function deleteMedicalProof(proof: MedicalProof): Promise<void> {
+  if (proof.storagePath) await supabase.storage.from(PROOF_BUCKET).remove([proof.storagePath]);
+  const { error } = await supabase.from('medical_proofs').delete().eq('id', proof.id);
   if (error) throw error;
+}
+/** Short-lived signed URL for a private proof (falls back to legacy base64 data). */
+export async function getMedicalProofUrl(proof: MedicalProof): Promise<string> {
+  if (!proof.storagePath) {
+    if (proof.fileData) return proof.fileData;
+    throw new Error('Proof has no file');
+  }
+  const { data, error } = await supabase.storage.from(PROOF_BUCKET).createSignedUrl(proof.storagePath, 300);
+  if (error) throw error;
+  return data.signedUrl;
 }
