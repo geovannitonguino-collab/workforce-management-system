@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +43,9 @@ export default function Login() {
         <Button type="submit" className="w-full" disabled={busy}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign in'}
         </Button>
+        <p className="text-xs text-muted-foreground text-center">
+          <Link className="underline" to="/terms">Términos / Terms</Link> · <Link className="underline" to="/privacy">Privacidad / Privacy</Link>
+        </p>
       </form>
     </div>
   );
