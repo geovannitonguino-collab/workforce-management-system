@@ -1,0 +1,89 @@
+name: backup
+
+# Nightly encrypted off-site backup. The repository is PUBLIC, so nothing is ever
+# stored in GitHub: dumps are encrypted with an `age` PUBLIC key and uploaded to a
+# private S3-compatible bucket. Only the holder of the private key can read them.
+# Without the BACKUP_* secrets configured this workflow does nothing.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DB_URL: ${{ secrets.BACKUP_DB_URL }}
+      AGE_PUBLIC_KEY: ${{ secrets.BACKUP_AGE_PUBLIC_KEY }}
+      S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+      S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      SUPABASE_URL: https://ebwucgarjpuqupwnprfn.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BACKUP_SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check configuration
+        id: cfg
+        run: |
+          missing=""
+          for v in DB_URL AGE_PUBLIC_KEY S3_BUCKET S3_ENDPOINT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Backups are NOT configured (missing:$missing). See docs/OPERATIONS.md"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install tools
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y --no-install-recommends postgresql-client-17 age >/dev/null
+
+      - name: Dump database
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p out
+          stamp=$(date -u +%Y%m%dT%H%M%SZ)
+          echo "STAMP=$stamp" >> "$GITHUB_ENV"
+          # public schema: structure + data (RLS policies, functions, triggers included)
+          pg_dump "$DB_URL" --format=custom --no-owner --no-privileges --schema=public -f out/public.dump
+          # auth users/identities so logins can be restored (data only)
+          pg_dump "$DB_URL" --format=custom --no-owner --no-privileges --data-only \
+            --table=auth.users --table=auth.identities -f out/auth.dump
+          # sanity: the dump must be readable and contain the core tables
+          pg_restore --list out/public.dump | grep -q 'TABLE public employees'
+          pg_restore --list out/public.dump | grep -q 'TABLE public time_entries'
+          pg_restore --list out/auth.dump   | grep -q 'TABLE DATA auth users'
+          test "$(stat -c%s out/public.dump)" -gt 10000
+
+      - name: Back up medical proof files
+        if: steps.cfg.outputs.ready == 'true' && env.SUPABASE_SERVICE_ROLE_KEY != ''
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/storage-tool && cd /tmp/storage-tool && npm init -y >/dev/null && npm i @supabase/supabase-js@2 >/dev/null
+          cd "$GITHUB_WORKSPACE"
+          NODE_PATH=/tmp/storage-tool/node_modules node scripts/backup-storage.mjs out/medical-proofs
+          tar -C out -cf out/medical-proofs.tar medical-proofs && rm -rf out/medical-proofs
+
+      - name: Encrypt and upload
+        if: steps.cfg.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          cd out
+          for f in *; do age -r "$AGE_PUBLIC_KEY" -o "$f.age" "$f" && rm "$f"; done
+          for f in *.age; do
+            aws s3 cp "$f" "s3://$S3_BUCKET/trackly/$STAMP/$f" --endpoint-url "$S3_ENDPOINT" --only-show-errors
+          done
+          echo "Uploaded $(ls | wc -l) encrypted file(s) for $STAMP"
