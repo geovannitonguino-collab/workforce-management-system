@@ -1,0 +1,59 @@
+name: monitor
+
+# Uptime + security smoke test. A failing run makes GitHub email the repo owner.
+# Only public values are used here (site URL, Supabase URL and the publishable key
+# that already ships inside the frontend bundle).
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+env:
+  SITE: https://trackly-geovannix.vercel.app
+  SUPABASE_URL: https://ebwucgarjpuqupwnprfn.supabase.co
+  PUBLISHABLE_KEY: sb_publishable_3rNzruOP_eRV7yRWgKBxZg_RHv_vXt2
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Site is up and serves the app shell
+        run: |
+          for path in / /terms /privacy; do
+            code=$(curl -s -o /tmp/body -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 5 "$SITE$path")
+            [ "$code" = "200" ] || { echo "::error::$SITE$path returned $code"; exit 1; }
+            grep -q 'id="root"' /tmp/body || { echo "::error::$SITE$path did not return the app shell"; exit 1; }
+          done
+
+      - name: Security headers are present
+        run: |
+          headers=$(curl -sI --max-time 20 "$SITE/")
+          for h in content-security-policy x-frame-options strict-transport-security x-content-type-options; do
+            echo "$headers" | grep -qi "^$h:" || { echo "::error::missing header $h"; exit 1; }
+          done
+
+      - name: Supabase Auth is healthy
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 --retry 2 --retry-delay 5 \
+            "$SUPABASE_URL/auth/v1/health" -H "apikey: $PUBLISHABLE_KEY")
+          [ "$code" = "200" ] || { echo "::error::Supabase auth health returned $code"; exit 1; }
+
+      - name: Anonymous users cannot read any data (RLS regression guard)
+        run: |
+          for t in employees time_entries leave_requests medical_proofs organizations \
+                   subscriptions time_corrections audit_log; do
+            out=$(curl -s --max-time 20 -w '\n%{http_code}' "$SUPABASE_URL/rest/v1/$t?select=*&limit=1" \
+              -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $PUBLISHABLE_KEY")
+            code=$(echo "$out" | tail -n1); body=$(echo "$out" | sed '$d')
+            if [ "$code" = "200" ] && [ "$body" != "[]" ]; then
+              echo "::error::table $t returned data to an anonymous caller"; exit 1
+            fi
+            case "$code" in 200|401|403) ;; *) echo "::error::table $t returned unexpected $code"; exit 1;; esac
+          done
+
+      - name: Public sign-up is disabled
+        run: |
+          out=$(curl -s --max-time 20 "$SUPABASE_URL/auth/v1/signup" -H "apikey: $PUBLISHABLE_KEY" \
+            -H 'Content-Type: application/json' -d '{"email":"monitor-probe@example.invalid","password":"x"}')
+          echo "$out" | grep -q 'signup_disabled' || { echo "::error::public sign-up appears to be ENABLED"; exit 1; }
