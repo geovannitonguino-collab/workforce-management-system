@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Employee, TimeEntry, LeaveRequest, MedicalProof } from '@/types/workforce';
+import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, CorrectionKind, ClockAction } from '@/types/workforce';
 
 function toEmployee(r: Record<string, unknown>): Employee {
   return {
@@ -69,7 +69,7 @@ export async function updateEmployee(id: string, updates: Partial<Employee>): Pr
 }
 
 export async function getTimeEntries(employeeId?: string): Promise<TimeEntry[]> {
-  let q = supabase.from('time_entries').select('*').order('timestamp');
+  let q = supabase.from('time_entries').select('*').is('voided_at', null).order('timestamp');
   if (employeeId) q = q.eq('employee_id', employeeId);
   const { data, error } = await q;
   if (error) throw error;
@@ -178,4 +178,47 @@ export async function getOrganizationName(): Promise<string | null> {
   const { data, error } = await supabase.from('organizations').select('name').maybeSingle();
   if (error) return null;
   return (data?.name as string | undefined) ?? null;
+}
+
+function toCorrection(r: Record<string, unknown>): TimeCorrection {
+  return {
+    id: r.id as string, employeeId: r.employee_id as string, kind: r.kind as CorrectionKind,
+    entryId: (r.entry_id as string | null) ?? undefined, action: (r.action as ClockAction | null) ?? undefined,
+    requestedTimestamp: (r.requested_timestamp as string | null) ?? undefined,
+    requestedDate: (r.requested_date as string | null) ?? undefined,
+    reason: r.reason as string, status: r.status as TimeCorrection['status'],
+    resolvedAt: (r.resolved_at as string | null) ?? undefined,
+    resolutionNote: (r.resolution_note as string | null) ?? undefined, createdAt: r.created_at as string,
+  };
+}
+
+export async function getTimeCorrections(employeeId?: string): Promise<TimeCorrection[]> {
+  let q = supabase.from('time_corrections').select('*').order('created_at', { ascending: false });
+  if (employeeId) q = q.eq('employee_id', employeeId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(toCorrection);
+}
+export async function addTimeCorrection(c: {
+  employeeId: string; kind: CorrectionKind; entryId?: string; action?: ClockAction;
+  requestedTimestamp?: string; requestedDate?: string; reason: string;
+}): Promise<void> {
+  const { error } = await supabase.from('time_corrections').insert({
+    employee_id: c.employeeId, kind: c.kind, entry_id: c.entryId ?? null, action: c.action ?? null,
+    requested_timestamp: c.requestedTimestamp ?? null, requested_date: c.requestedDate ?? null, reason: c.reason,
+  });
+  if (error) throw error;
+}
+export async function resolveTimeCorrection(id: string, approve: boolean, note?: string): Promise<void> {
+  const { error } = await supabase.rpc('resolve_time_correction', { p_id: id, p_approve: approve, p_note: note ?? null });
+  if (error) throw error;
+}
+export async function getAuditLog(limit = 50): Promise<AuditEvent[]> {
+  const { data, error } = await supabase.from('audit_log').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(r => ({
+    id: r.id as string, actorId: (r.actor_id as string | null) ?? undefined, event: r.event as string,
+    entity: r.entity as string, entityId: (r.entity_id as string | null) ?? undefined,
+    details: (r.details ?? {}) as Record<string, unknown>, createdAt: r.created_at as string,
+  }));
 }

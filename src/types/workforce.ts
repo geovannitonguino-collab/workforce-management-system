@@ -95,3 +95,30 @@ export interface ClockStatus {
   currentSessionStart?: string;
   todayEntries: TimeEntry[];
 }
+
+export type CorrectionKind = 'add' | 'edit' | 'void';
+
+export interface TimeCorrection {
+  id: string;
+  employeeId: string;
+  kind: CorrectionKind;
+  entryId?: string;
+  action?: ClockAction;
+  requestedTimestamp?: string;
+  requestedDate?: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  resolvedAt?: string;
+  resolutionNote?: string;
+  createdAt: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  actorId?: string;
+  event: string;
+  entity: string;
+  entityId?: string;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
