@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getEmployees, getTimeEntries, getLeaveRequests, updateLeaveRequest, addEmployee, updateEmployee } from '@/lib/store';
 import { Employee, LeaveRequest } from '@/types/workforce';
-import { calculateDailySummary, calculatePayroll, getCurrentPeriod, formatCurrency, formatHours, formatDate } from '@/lib/calculations';
+import { calculateDailySummary, calculatePayroll, getCurrentPeriod, getToday, formatCurrency, formatHours, formatDate } from '@/lib/calculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import AdminCorrections from '@/components/AdminCorrections';
+import BillingBanner from '@/components/BillingBanner';
 import { Users, DollarSign, Download, PlusCircle, Edit, FileText, Clock, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Props { onEmployeeChange?: () => void; }
@@ -87,6 +88,8 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
           </div>
         ))}
       </div>
+
+      <BillingBanner key={employees.length} />
 
       <AdminCorrections employees={employees} onResolved={loadAll} />
 
@@ -226,11 +229,12 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
 function AddEmployeeDialog({ onAdd }: { onAdd: () => void }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const [f, setF] = useState({ name:'', email:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setF(prev => ({ ...prev, [k]: e.target.value }));
 
   const submit = async () => {
-    setSaving(true);
+    setSaving(true); setErr(null);
     try {
       // Bug fix #4: correct defaults — 0.416 days/mo and 40h PTO
       await addEmployee({
@@ -238,12 +242,15 @@ function AddEmployeeDialog({ onAdd }: { onAdd: () => void }) {
         hourlyRate: parseFloat(f.hourlyRate) || 0,
         vacationAccrualRate: parseFloat(f.vacationAccrualRate) || 0.416,
         paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || 40,
-        hireDate: f.hireDate || new Date().toISOString().split('T')[0],
+        hireDate: f.hireDate || getToday(),
         department: f.department,
       });
       setOpen(false);
       setF({ name:'', email:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
       onAdd();
+    } catch (e) {
+      const msg = String((e as { message?: string })?.message ?? '');
+      setErr(msg.includes('billing:') ? 'Your plan does not allow adding more employees (limit reached or subscription inactive). Contact contacto@geovannix.com.' : 'Could not add the employee. Check the data and try again.');
     } finally { setSaving(false); }
   };
 
@@ -264,6 +271,7 @@ function AddEmployeeDialog({ onAdd }: { onAdd: () => void }) {
             <div><Label>PTO Limit (hrs/yr)</Label><Input type="number" value={f.paidPtoLimitHours} onChange={set('paidPtoLimitHours')} placeholder="40" /></div>
             <div className="col-span-2"><Label>Vacation Accrual (days/month)</Label><Input type="number" step="0.001" value={f.vacationAccrualRate} onChange={set('vacationAccrualRate')} placeholder="0.416" /></div>
           </div>
+          {err && <p className="text-sm text-destructive">{err}</p>}
           <Button className="w-full" onClick={submit} disabled={!f.name || !f.email || saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Add Employee
           </Button>
