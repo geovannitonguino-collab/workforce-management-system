@@ -97,7 +97,7 @@ export function calculateLeaveBalance(employee: Employee, leaveRequests: LeaveRe
 
   // Bug fix #1: filter by startDate year (actual leave month), not createdAt
   const thisYearApproved = leaveRequests.filter(
-    r => r.status === 'approved' && new Date(r.startDate).getFullYear() === year
+    r => r.status === 'approved' && parseLocalDate(r.startDate).getFullYear() === year
   );
 
   const usedPaidPtoHours = thisYearApproved
