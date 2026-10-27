@@ -173,3 +173,9 @@ export async function getMedicalProofUrl(proof: MedicalProof): Promise<string> {
   if (error) throw error;
   return data.signedUrl;
 }
+
+export async function getOrganizationName(): Promise<string | null> {
+  const { data, error } = await supabase.from('organizations').select('name').maybeSingle();
+  if (error) return null;
+  return (data?.name as string | undefined) ?? null;
+}
