@@ -3,52 +3,47 @@ import { getEmployees } from '@/lib/store';
 import { AppView, Employee } from '@/types/workforce';
 import EmployeeDashboard from '@/components/EmployeeDashboard';
 import AdminDashboard from '@/components/AdminDashboard';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/lib/auth';
+import Login from '@/pages/Login';
 import { Button } from '@/components/ui/button';
-import { Users, User, Loader2, LayoutDashboard } from 'lucide-react';
+import { User, Loader2, LayoutDashboard, LogOut } from 'lucide-react';
 import geovannixLogo from '@/assets/geovannix-logo.png';
 
-const CURRENT_USER_KEY = 'wms_current_user_id';
-
 export default function Index() {
+  const { session, loading: authLoading, signOut } = useAuth();
   const [view, setView] = useState<AppView>('employee');
-  const [currentUserId, setCurrentUserId] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const userId = session?.user.id;
+
   useEffect(() => {
+    if (!userId) { setEmployees([]); setLoading(false); return; }
+    setLoading(true);
+    setError(null);
     (async () => {
       try {
-        const emps = await getEmployees();
-        setEmployees(emps);
-        const savedId = localStorage.getItem(CURRENT_USER_KEY);
-        const defaultId = savedId && emps.find(e => e.id === savedId) ? savedId : emps[0]?.id ?? '';
-        setCurrentUserId(defaultId);
-      } catch (e) {
+        setEmployees(await getEmployees());
+      } catch {
         setError('Failed to load data. Check your connection.');
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [userId]);
 
-  const currentEmployee = employees.find(e => e.id === currentUserId);
+  // RLS guarantees a non-admin only receives their own row; admins receive all.
+  const currentEmployee = employees.find(e => e.userId === userId);
   const isAdmin = currentEmployee?.role === 'admin';
 
   useEffect(() => {
-    if (view === 'admin' && !isAdmin) {
-      setView('employee');
-    }
-  }, [isAdmin, view]);
-
-  const switchUser = (id: string) => {
-    setCurrentUserId(id);
-    localStorage.setItem(CURRENT_USER_KEY, id);
-    const emp = employees.find(e => e.id === id);
-    if (emp?.role === 'admin') setView('admin');
+    if (isAdmin) setView('admin');
     else setView('employee');
-  };
+  }, [isAdmin]);
+
+  if (authLoading) return null;
+  if (!session) return <Login />;
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,18 +68,10 @@ export default function Index() {
             )}
           </div>
 
-          <Select value={currentUserId} onValueChange={switchUser} disabled={loading}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder={loading ? 'Loading...' : 'Select user'} />
-            </SelectTrigger>
-            <SelectContent>
-              {employees.map(emp => (
-                <SelectItem key={emp.id} value={emp.id}>
-                  {emp.name}{emp.role === 'admin' ? ' (Admin)' : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground hidden sm:inline">{currentEmployee?.name ?? session.user.email}</span>
+            <Button variant="outline" size="sm" onClick={signOut}><LogOut className="h-4 w-4" /> Sign out</Button>
+          </div>
         </div>
       </header>
 
@@ -92,7 +79,7 @@ export default function Index() {
         {loading ? (
           <div className="flex items-center justify-center py-32 gap-3 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
-            <span>Connecting to Supabase…</span>
+            <span>Loading…</span>
           </div>
         ) : error ? (
           <div className="flex items-center justify-center py-32">
@@ -103,7 +90,7 @@ export default function Index() {
         ) : view === 'admin' ? (
           <AdminDashboard onEmployeeChange={async () => setEmployees(await getEmployees())} />
         ) : (
-          <p className="text-muted-foreground text-center py-20">Select a user to get started.</p>
+          <p className="text-muted-foreground text-center py-20">Your account is not linked to an employee record. Contact your administrator.</p>
         )}
       </main>
     </div>

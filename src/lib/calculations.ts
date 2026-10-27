@@ -46,7 +46,9 @@ export function calculateDailySummary(entries: TimeEntry[], employeeId: string, 
 }
 
 export function getToday(): string {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function getCurrentPeriod(): string {

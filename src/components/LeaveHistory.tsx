@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Employee, LeaveRequest, MedicalProof } from '@/types/workforce';
-import { getLeaveRequests, getMedicalProofs } from '@/lib/store';
+import { getLeaveRequests, getMedicalProofs, getMedicalProofUrl } from '@/lib/store';
 import { formatDate } from '@/lib/calculations';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -158,7 +158,7 @@ export default function LeaveHistory({ employee }: Props) {
                     {proofs.map(p => (
                       <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50">
                         <div><p className="text-sm font-medium truncate">{p.fileName}</p><p className="text-xs text-muted-foreground">{formatDate(p.uploadedAt)}</p></div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPreview(p.fileData)}><Eye className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={async () => { try { setPreview(await getMedicalProofUrl(p)); } catch { alert('Could not open file.'); } }}><Eye className="h-3.5 w-3.5" /></Button>
                       </div>
                     ))}
                   </div>
