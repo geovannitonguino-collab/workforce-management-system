@@ -6,6 +6,7 @@ import LeaveBalanceCard from '@/components/LeaveBalanceCard';
 import LeaveRequestForm from '@/components/LeaveRequestForm';
 import PayrollEstimate from '@/components/PayrollEstimate';
 import LeaveHistory from '@/components/LeaveHistory';
+import TimeCorrections from '@/components/TimeCorrections';
 import LeaveAnalytics from '@/components/LeaveAnalytics';
 import { User, Briefcase, Mail, CalendarDays } from 'lucide-react';
 
@@ -46,6 +47,7 @@ export default function EmployeeDashboard({ employee, onEmployeeUpdate }: Props)
         <div className="space-y-6">
           <TimeClock employeeId={employee.id} onUpdate={refresh} />
           <LeaveRequestForm employee={employee} onSubmit={refresh} />
+          <TimeCorrections key={`corr-${refreshKey}`} employee={employee} />
         </div>
         <div className="space-y-6">
           <PayrollEstimate key={`payroll-${refreshKey}`} employee={employee} />
