@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, CorrectionKind, ClockAction } from '@/types/workforce';
+import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, BillingStatus, CorrectionKind, ClockAction } from '@/types/workforce';
 
 function toEmployee(r: Record<string, unknown>): Employee {
   return {
@@ -227,4 +227,18 @@ export async function getAuditLog(limit = 50): Promise<AuditEvent[]> {
 export async function acceptTerms(version: string): Promise<void> {
   const { error } = await supabase.rpc('accept_terms', { p_version: version });
   if (error) throw error;
+}
+
+export async function getBillingStatus(): Promise<BillingStatus | null> {
+  const { data, error } = await supabase.rpc('get_billing_status');
+  if (error || !data || data.length === 0) return null;
+  const r = data[0] as Record<string, unknown>;
+  return {
+    planId: r.plan_id as string, planName: r.plan_name as string,
+    status: r.status as BillingStatus['status'], effective: r.effective as BillingStatus['effective'],
+    trialEndsAt: (r.trial_ends_at as string | null) ?? undefined,
+    currentPeriodEnd: (r.current_period_end as string | null) ?? undefined,
+    maxEmployees: (r.max_employees as number | null) ?? undefined,
+    employeeCount: Number(r.employee_count), canAddEmployees: r.can_add_employees as boolean,
+  };
 }

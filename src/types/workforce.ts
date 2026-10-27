@@ -123,3 +123,15 @@ export interface AuditEvent {
   details: Record<string, unknown>;
   createdAt: string;
 }
+
+export interface BillingStatus {
+  planId: string;
+  planName: string;
+  status: 'trialing' | 'active' | 'past_due' | 'canceled';
+  effective: 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired';
+  trialEndsAt?: string;
+  currentPeriodEnd?: string;
+  maxEmployees?: number;
+  employeeCount: number;
+  canAddEmployees: boolean;
+}
