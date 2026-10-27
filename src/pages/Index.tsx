@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getEmployees } from '@/lib/store';
+import { getEmployees, getOrganizationName } from '@/lib/store';
 import { AppView, Employee } from '@/types/workforce';
 import EmployeeDashboard from '@/components/EmployeeDashboard';
 import AdminDashboard from '@/components/AdminDashboard';
@@ -15,6 +15,7 @@ export default function Index() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
 
   const userId = session?.user.id;
 
@@ -25,6 +26,7 @@ export default function Index() {
     (async () => {
       try {
         setEmployees(await getEmployees());
+        setOrgName(await getOrganizationName());
       } catch {
         setError('Failed to load data. Check your connection.');
       } finally {
@@ -52,7 +54,7 @@ export default function Index() {
           <div className="flex items-center gap-2">
             <img src={geovannixLogo} alt="Geovannix" className="h-9" />
             <div>
-              <h1 className="text-base font-bold text-foreground leading-none">Geovannix</h1>
+              <h1 className="text-base font-bold text-foreground leading-none">{orgName ?? 'Geovannix'}</h1>
               <p className="text-xs text-muted-foreground">Workforce Management</p>
             </div>
           </div>
