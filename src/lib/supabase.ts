@@ -16,7 +16,8 @@ function readLandingAuthParams(): { recovery: boolean; error: string | null } {
   const raw = `${window.location.hash.replace(/^#/, '')}&${window.location.search.replace(/^\?/, '')}`;
   const params = new URLSearchParams(raw);
   return {
-    recovery: params.get('type') === 'recovery',
+    // invite links also land the person with a session but no password yet
+    recovery: params.get('type') === 'recovery' || params.get('type') === 'invite',
     error: params.get('error_code') ?? params.get('error'),
   };
 }
