@@ -5,6 +5,8 @@ import EmployeeDashboard from '@/components/EmployeeDashboard';
 import AdminDashboard from '@/components/AdminDashboard';
 import { useAuth } from '@/lib/auth';
 import Login from '@/pages/Login';
+import ResetPassword from '@/pages/ResetPassword';
+import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import TermsGate from '@/components/TermsGate';
 import { TERMS_VERSION } from '@/lib/legal';
 import { Button } from '@/components/ui/button';
@@ -12,7 +14,7 @@ import { User, Loader2, LayoutDashboard, LogOut } from 'lucide-react';
 import geovannixLogo from '@/assets/geovannix-logo.png';
 
 export default function Index() {
-  const { session, loading: authLoading, signOut } = useAuth();
+  const { session, loading: authLoading, recovering, signOut } = useAuth();
   const [view, setView] = useState<AppView>('employee');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,7 @@ export default function Index() {
   }, [isAdmin]);
 
   if (authLoading) return null;
+  if (recovering && session) return <ResetPassword />;
   if (!session) return <Login />;
 
   return (
@@ -74,6 +77,7 @@ export default function Index() {
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground hidden sm:inline">{currentEmployee?.name ?? session.user.email}</span>
+            <ChangePasswordDialog />
             <Button variant="outline" size="sm" onClick={signOut}><LogOut className="h-4 w-4" /> Sign out</Button>
           </div>
         </div>
