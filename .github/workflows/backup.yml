@@ -64,8 +64,8 @@ jobs:
           mkdir -p out
           stamp=$(date -u +%Y%m%dT%H%M%SZ)
           echo "STAMP=$stamp" >> "$GITHUB_ENV"
-          # public schema: structure + data (RLS policies, functions, triggers included)
-          pg_dump "$DB_URL" --format=custom --no-owner --no-privileges --schema=public -f out/public.dump
+          # public + private schemas: structure + data (RLS policies and the private helper functions they depend on)
+          pg_dump "$DB_URL" --format=custom --no-owner --no-privileges --schema=public --schema=private -f out/public.dump
           # auth users/identities so logins can be restored (data only)
           pg_dump "$DB_URL" --format=custom --no-owner --no-privileges --data-only \
             --table=auth.users --table=auth.identities -f out/auth.dump
