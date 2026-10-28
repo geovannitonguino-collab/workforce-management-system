@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import AdminCorrections from '@/components/AdminCorrections';
 import BillingBanner from '@/components/BillingBanner';
+import ClockNetworkSettings from '@/components/ClockNetworkSettings';
 import { Users, DollarSign, Download, PlusCircle, Edit, FileText, Clock, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Props { onEmployeeChange?: () => void; }
@@ -90,6 +91,8 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
       </div>
 
       <BillingBanner key={employees.length} />
+
+      <ClockNetworkSettings />
 
       <AdminCorrections employees={employees} onResolved={loadAll} />
 
