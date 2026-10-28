@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  SITE: https://trackly-geovannix.vercel.app
+  SITE: https://app.geovannix.com
   SUPABASE_URL: https://ebwucgarjpuqupwnprfn.supabase.co
   PUBLISHABLE_KEY: sb_publishable_3rNzruOP_eRV7yRWgKBxZg_RHv_vXt2
 
