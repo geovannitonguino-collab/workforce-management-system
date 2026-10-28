@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, landingAuth } from '@/lib/supabase';
 
 export const MIN_PASSWORD_LENGTH = 10;
 
@@ -9,6 +9,8 @@ interface AuthState {
   loading: boolean;
   /** true while the user arrived through a password-recovery email link */
   recovering: boolean;
+  /** set when the user landed from an email link that failed (expired / already used) */
+  linkError: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   /** Always resolves without revealing whether the email has an account. */
@@ -24,16 +26,23 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [recovering, setRecovering] = useState(false);
+  const [recovering, setRecovering] = useState(landingAuth.recovery);
+  const [linkError, setLinkError] = useState<string | null>(landingAuth.error);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
+      if (landingAuth.recovery && !data.session) {
+        // the link was a recovery link but no session came out of it
+        setRecovering(false);
+        setLinkError(prev => prev ?? 'invalid_link');
+      }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
       if (event === 'PASSWORD_RECOVERY') setRecovering(true);
+      if (event === 'PASSWORD_RECOVERY') setLinkError(null);
       if (event === 'SIGNED_OUT') setRecovering(false);
     });
     return () => sub.subscription.unsubscribe();
@@ -77,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, loading, recovering, signIn, signOut, sendPasswordReset, setNewPassword, changePassword }}>
+    <AuthContext.Provider value={{ session, loading, recovering, linkError, signIn, signOut, sendPasswordReset, setNewPassword, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

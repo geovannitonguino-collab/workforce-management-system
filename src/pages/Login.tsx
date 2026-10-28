@@ -8,8 +8,8 @@ import { Loader2 } from 'lucide-react';
 import geovannixLogo from '@/assets/geovannix-logo.png';
 
 export default function Login() {
-  const { signIn, sendPasswordReset } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'forgot'>('signin');
+  const { signIn, sendPasswordReset, linkError } = useAuth();
+  const [mode, setMode] = useState<'signin' | 'forgot'>(linkError ? 'forgot' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +40,13 @@ export default function Login() {
             <p className="text-xs text-muted-foreground">Workforce Management</p>
           </div>
         </div>
+
+        {linkError && (
+          <p className="text-sm text-destructive">
+            That link is invalid, expired or was already used. Request a new one below.
+            <br />El enlace no es válido, caducó o ya se usó. Pide uno nuevo aquí abajo.
+          </p>
+        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="email">Email</Label>
