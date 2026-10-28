@@ -242,3 +242,22 @@ export async function getBillingStatus(): Promise<BillingStatus | null> {
     employeeCount: Number(r.employee_count), canAddEmployees: r.can_add_employees as boolean,
   };
 }
+
+export async function getMyIp(): Promise<string | null> {
+  const { data, error } = await supabase.rpc('my_ip');
+  return error ? null : (data as string | null);
+}
+/** true when the organization has no network restriction or this connection is allowed. Fails open on error (the database still enforces). */
+export async function canClockHere(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('can_clock_here');
+  return error ? true : data === true;
+}
+export async function getClockPolicy(): Promise<{ enabled: boolean; ips: string[] } | null> {
+  const { data, error } = await supabase.rpc('get_clock_policy');
+  if (error || !data || data.length === 0) return null;
+  return { enabled: data[0].enabled as boolean, ips: (data[0].ips as string[]) ?? [] };
+}
+export async function setClockPolicy(enabled: boolean, ips: string[]): Promise<void> {
+  const { error } = await supabase.rpc('set_clock_policy', { p_enabled: enabled, p_ips: ips });
+  if (error) throw error;
+}
