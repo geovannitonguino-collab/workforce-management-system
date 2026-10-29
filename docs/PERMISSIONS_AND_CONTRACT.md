@@ -19,8 +19,10 @@ produce un **estimado de pago bruto** (ver Términos, sección 4).
 
 Reglas fijas:
 - Un empleado pertenece a **un** departamento. Un departamento tiene **un** manager. Un manager puede dirigir varios departamentos.
-- Solo el Director asigna roles, crea departamentos y nombra managers.
-- Un Manager nunca puede ascender a nadie ni cambiar su propio rol.
+- El Director crea departamentos, nombra al manager de cada uno, mueve gente entre departamentos y es el único que crea otros Directores.
+- Un Manager **puede ascender o descender (Employee ⇄ Manager) y cambiar el correo** de las personas de su estructura, pero no puede crear Directores, mover gente de departamento, ni editarse a sí mismo.
+- Un Director nunca queda "bajo" un Manager, aunque figure en su departamento.
+- Ninguna fila de datos puede cambiar de empresa jamás: es la garantía de aislamiento entre clientes.
 - Nadie puede cambiar su propio contrato, tarifa ni rol. Nadie edita fichajes de forma directa (solo solicitud de corrección aprobada).
 
 ## 2. Matriz de permisos (propuesta)
