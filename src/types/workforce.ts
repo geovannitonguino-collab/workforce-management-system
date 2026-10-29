@@ -1,7 +1,8 @@
 export interface Employee {
   id: string;
   name: string;
-  email: string;
+  email: string; // corporate email = the login; only a director changes it
+  personalEmail?: string; // HR contact (emergencies, hiring communications)
   userId?: string; // linked Supabase Auth user
   termsVersion?: string; // last accepted Terms/Privacy version
   /** 'admin' is the legacy name of 'director' (kept so older rows still work) */

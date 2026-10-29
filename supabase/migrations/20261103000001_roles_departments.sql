@@ -25,6 +25,13 @@ alter table public.departments enable row level security;
 
 alter table public.employees
   add column if not exists department_id uuid references public.departments(id) on delete set null;
+
+-- Correo personal: dato de RR. HH. (emergencias, comunicaciones de contratación). NO es el del login.
+-- El correo corporativo (columna email) es el del login y solo lo cambia un director.
+alter table public.employees add column if not exists personal_email text;
+alter table public.employees drop constraint if exists employees_personal_email_format;
+alter table public.employees add constraint employees_personal_email_format
+  check (personal_email is null or personal_email ~* '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$');
 create index if not exists employees_department_idx on public.employees (department_id);
 
 -- Roles nuevos: 'admin' -> 'director'
@@ -108,8 +115,8 @@ create trigger departments_validate before insert or update on public.department
 --    es la garantía de aislamiento entre empresas.
 --  * El director cambia todo lo demás dentro de su empresa.
 --  * El manager, sobre las personas de su estructura (las que le permite la política de la tabla): puede cambiar
---    su correo y su rol entre Employee y Manager (ascender/descender), pero no crear directores ni moverlas
---    de departamento. A sí mismo no se puede editar (lo impide la política).
+--    su correo PERSONAL y su rol entre Employee y Manager (ascender/descender), pero no el correo corporativo
+--    (el del login), ni crear directores, ni moverlas de departamento. A sí mismo no se puede editar.
 -- SIN security definer: current_user = 'authenticated' solo en llamadas directas del cliente.
 create or replace function private.protect_employee_columns()
 returns trigger language plpgsql set search_path = '' as $$
@@ -120,6 +127,9 @@ begin
     if not private.is_admin() then
       if new.department_id is distinct from old.department_id then
         raise exception 'only a director can move people between departments';
+      end if;
+      if lower(new.email) is distinct from lower(old.email) then
+        raise exception 'only a director can change the corporate (login) email';
       end if;
       if new.role is distinct from old.role
          and (old.role not in ('employee','manager') or new.role not in ('employee','manager')) then
@@ -164,7 +174,7 @@ create trigger employees_clear_manager after update on public.employees
 -- La bitácora también registra el cambio de departamento
 create or replace function private.audit_employee()
 returns trigger language plpgsql security definer set search_path = '' as $$
-declare keys text[] := array['role','hourly_rate','vacation_accrual_rate','paid_pto_limit_hours','hire_date','department','department_id','email','name'];
+declare keys text[] := array['role','hourly_rate','vacation_accrual_rate','paid_pto_limit_hours','hire_date','department','department_id','email','personal_email','name'];
         k text; changes jsonb := '{}'::jsonb;
 begin
   if tg_op = 'INSERT' then
