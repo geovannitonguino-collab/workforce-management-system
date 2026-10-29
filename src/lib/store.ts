@@ -5,6 +5,7 @@ function toEmployee(r: Record<string, unknown>): Employee {
   return {
     id: r.id as string, name: r.name as string, email: r.email as string,
     userId: (r.user_id as string | null) ?? undefined,
+    personalEmail: (r.personal_email as string | null) ?? undefined,
     termsVersion: (r.terms_version as string | null) ?? undefined,
     role: r.role as Employee['role'], hourlyRate: Number(r.hourly_rate),
     vacationAccrualRate: Number(r.vacation_accrual_rate),
@@ -52,6 +53,7 @@ export async function addEmployee(emp: Omit<Employee, 'id'> & { id?: string }): 
     hire_date: emp.hireDate, department: emp.department, avatar_url: emp.avatarUrl ?? null,
   };
   if (emp.departmentId) row.department_id = emp.departmentId;
+  if (emp.personalEmail) row.personal_email = emp.personalEmail;
   if (emp.id) row.id = emp.id;
   const { data, error } = await supabase.from('employees').insert(row).select().single();
   if (error) throw error;
@@ -61,6 +63,7 @@ export async function updateEmployee(id: string, updates: Partial<Employee>): Pr
   const row: Record<string, unknown> = {};
   if (updates.name !== undefined) row.name = updates.name;
   if (updates.email !== undefined) row.email = updates.email;
+  if (updates.personalEmail !== undefined) row.personal_email = updates.personalEmail || null;
   if (updates.role !== undefined) row.role = updates.role;
   if (updates.hourlyRate !== undefined) row.hourly_rate = updates.hourlyRate;
   if (updates.vacationAccrualRate !== undefined) row.vacation_accrual_rate = updates.vacationAccrualRate;

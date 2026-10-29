@@ -217,7 +217,7 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
               {employees.map(emp => (
                 <TableRow key={emp.id} className="hover:bg-muted/30">
                   <TableCell>
-                    <div><p className="text-sm font-medium">{emp.name}</p><p className="text-xs text-muted-foreground">{emp.email}</p></div>
+                    <div><p className="text-sm font-medium">{emp.name}</p><p className="text-xs text-muted-foreground">{emp.email}</p>{emp.personalEmail && <p className="text-[11px] text-muted-foreground/80">Personal: {emp.personalEmail}</p>}</div>
                   </TableCell>
                   <TableCell className="text-sm">{departments.find(d => d.id === emp.departmentId)?.name ?? emp.department}</TableCell>
                   <TableCell className="font-mono text-sm font-semibold text-primary">{formatCurrency(emp.hourlyRate)}</TableCell>
@@ -252,7 +252,7 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [f, setF] = useState({ name:'', email:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
+  const [f, setF] = useState({ name:'', email:'', personalEmail:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setF(prev => ({ ...prev, [k]: e.target.value }));
 
   const submit = async () => {
@@ -260,7 +260,7 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () 
     try {
       // Bug fix #4: correct defaults — 0.416 days/mo and 40h PTO
       await addEmployee({
-        name: f.name, email: f.email, role: 'employee',
+        name: f.name, email: f.email, personalEmail: f.personalEmail.trim() || undefined, role: 'employee',
         hourlyRate: parseFloat(f.hourlyRate) || 0,
         vacationAccrualRate: parseFloat(f.vacationAccrualRate) || 0.416,
         paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || 40,
@@ -270,7 +270,7 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () 
       });
       setOpen(false);
       setDeptId('');
-      setF({ name:'', email:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
+      setF({ name:'', email:'', personalEmail:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
       onAdd();
     } catch (e) {
       const msg = String((e as { message?: string })?.message ?? '');
@@ -288,7 +288,8 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () 
         <div className="space-y-3 pt-1">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Full Name</Label><Input value={f.name} onChange={set('name')} placeholder="e.g. María García" /></div>
-            <div className="col-span-2"><Label>Email</Label><Input value={f.email} onChange={set('email')} placeholder="maria@company.com" /></div>
+            <div className="col-span-2"><Label>Corporate email (sign-in)</Label><Input value={f.email} onChange={set('email')} placeholder="maria@company.com" /></div>
+            <div className="col-span-2"><Label>Personal email (HR contact, optional)</Label><Input type="email" value={f.personalEmail} onChange={set('personalEmail')} placeholder="maria.personal@gmail.com" /></div>
             <div>
               <Label>Department</Label>
               {departments.length > 0 ? (
@@ -321,7 +322,7 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
   const [f, setF] = useState({
     hourlyRate: String(employee.hourlyRate), paidPtoLimitHours: String(employee.paidPtoLimitHours),
     vacationAccrualRate: String(employee.vacationAccrualRate), department: employee.department,
-    email: employee.email,
+    email: employee.email, personalEmail: employee.personalEmail ?? '',
   });
   const currentRole: 'director' | 'manager' | 'employee' = isDirectorRole(employee.role) ? 'director' : employee.role;
   const [role, setRole] = useState<'director' | 'manager' | 'employee'>(currentRole);
@@ -335,7 +336,7 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
     setF({
       hourlyRate: String(employee.hourlyRate), paidPtoLimitHours: String(employee.paidPtoLimitHours),
       vacationAccrualRate: String(employee.vacationAccrualRate), department: employee.department,
-      email: employee.email,
+      email: employee.email, personalEmail: employee.personalEmail ?? '',
     });
     setRole(isDirectorRole(employee.role) ? 'director' : employee.role);
     setErr(null);
@@ -351,7 +352,8 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
         paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || employee.paidPtoLimitHours,
         vacationAccrualRate: parseFloat(f.vacationAccrualRate) || employee.vacationAccrualRate,
         ...(isDirector && !employee.departmentId ? { department: f.department } : {}),
-        ...(f.email.trim() && f.email.trim().toLowerCase() !== employee.email.toLowerCase() ? { email: f.email.trim() } : {}),
+        ...(isDirector && f.email.trim() && f.email.trim().toLowerCase() !== employee.email.toLowerCase() ? { email: f.email.trim() } : {}),
+        ...(f.personalEmail.trim() !== (employee.personalEmail ?? '') ? { personalEmail: f.personalEmail.trim() } : {}),
         ...(role !== currentRole ? { role } : {}),
       });
       setOpen(false); onSave();
@@ -360,6 +362,7 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
       setErr(
         m.includes('at least one director') ? 'The organization must keep at least one director.'
         : m.includes('only set the role') ? 'A manager can only set the role to Employee or Manager.'
+        : m.includes('personal_email_format') ? 'The personal email is not valid.'
         : m.includes('duplicate') || m.includes('uniq') ? 'Another person in the company already uses that email.'
         : 'Could not save the change.');
     } finally { setSaving(false); }
@@ -375,9 +378,17 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
         <div className="space-y-3 pt-1">
           {isDirector && !employee.departmentId && <div><Label>Department</Label><Input value={f.department} onChange={set('department')} /></div>}
           <div>
-            <Label>Email</Label>
-            <Input type="email" value={f.email} onChange={set('email')} />
-            {employee.userId && <p className="text-xs text-muted-foreground mt-1">This person already has a login; their sign-in email does not change.</p>}
+            <Label>Corporate email (sign-in)</Label>
+            <Input type="email" value={f.email} onChange={set('email')} disabled={!isDirector} />
+            <p className="text-xs text-muted-foreground mt-1">
+              {isDirector
+                ? (employee.userId ? 'This person already has a login; changing this does not change the email they sign in with.' : 'Used to create their login.')
+                : 'Only a director can change the corporate email.'}
+            </p>
+          </div>
+          <div>
+            <Label>Personal email (HR contact)</Label>
+            <Input type="email" value={f.personalEmail} onChange={set('personalEmail')} placeholder="For emergencies and hiring communications" />
           </div>
           <div>
             <Label>Role</Label>
