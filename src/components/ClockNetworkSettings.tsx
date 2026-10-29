@@ -8,6 +8,7 @@ import { Loader2, Wifi, X } from 'lucide-react';
 /** Admin-only: restrict punching to the workplace network. */
 export default function ClockNetworkSettings() {
   const [loaded, setLoaded] = useState(false);
+  const [allowed, setAllowed] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [ips, setIps] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
@@ -18,13 +19,13 @@ export default function ClockNetworkSettings() {
   useEffect(() => {
     (async () => {
       const [p, ip] = await Promise.all([getClockPolicy(), getMyIp()]);
-      if (p) { setEnabled(p.enabled); setIps(p.ips); }
+      if (p) { setEnabled(p.enabled); setIps(p.ips); setAllowed(true); }
       setMyIp(ip);
       setLoaded(true);
     })();
   }, []);
 
-  if (!loaded) return null;
+  if (!loaded || !allowed) return null;
 
   const add = (value: string) => {
     const v = value.trim();

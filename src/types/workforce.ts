@@ -4,12 +4,14 @@ export interface Employee {
   email: string;
   userId?: string; // linked Supabase Auth user
   termsVersion?: string; // last accepted Terms/Privacy version
-  role: 'employee' | 'admin';
+  /** 'admin' is the legacy name of 'director' (kept so older rows still work) */
+  role: 'director' | 'manager' | 'employee' | 'admin';
   hourlyRate: number;
   vacationAccrualRate: number; // fixed at 0.416 days/month
   paidPtoLimitHours: number; // fixed at 40 (5 days × 8h)
   hireDate: string;
   department: string;
+  departmentId?: string;
   avatarUrl?: string;
 }
 
@@ -135,3 +137,13 @@ export interface BillingStatus {
   employeeCount: number;
   canAddEmployees: boolean;
 }
+
+export interface Department {
+  id: string;
+  name: string;
+  managerEmployeeId?: string;
+}
+
+export const isDirectorRole = (r?: Employee['role']) => r === 'director' || r === 'admin';
+export const roleLabel = (r: Employee['role']) =>
+  r === 'director' || r === 'admin' ? 'Director' : r === 'manager' ? 'Manager' : 'Employee';

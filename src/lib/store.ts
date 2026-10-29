@@ -1,15 +1,16 @@
 import { supabase } from '@/lib/supabase';
-import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, BillingStatus, CorrectionKind, ClockAction } from '@/types/workforce';
+import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, BillingStatus, Department, CorrectionKind, ClockAction } from '@/types/workforce';
 
 function toEmployee(r: Record<string, unknown>): Employee {
   return {
     id: r.id as string, name: r.name as string, email: r.email as string,
     userId: (r.user_id as string | null) ?? undefined,
     termsVersion: (r.terms_version as string | null) ?? undefined,
-    role: r.role as 'employee' | 'admin', hourlyRate: Number(r.hourly_rate),
+    role: r.role as Employee['role'], hourlyRate: Number(r.hourly_rate),
     vacationAccrualRate: Number(r.vacation_accrual_rate),
     paidPtoLimitHours: Number(r.paid_pto_limit_hours),
     hireDate: r.hire_date as string, department: r.department as string,
+    departmentId: (r.department_id as string | null) ?? undefined,
     avatarUrl: r.avatar_url as string | undefined,
   };
 }
@@ -50,6 +51,7 @@ export async function addEmployee(emp: Omit<Employee, 'id'> & { id?: string }): 
     vacation_accrual_rate: emp.vacationAccrualRate, paid_pto_limit_hours: emp.paidPtoLimitHours,
     hire_date: emp.hireDate, department: emp.department, avatar_url: emp.avatarUrl ?? null,
   };
+  if (emp.departmentId) row.department_id = emp.departmentId;
   if (emp.id) row.id = emp.id;
   const { data, error } = await supabase.from('employees').insert(row).select().single();
   if (error) throw error;
@@ -65,6 +67,7 @@ export async function updateEmployee(id: string, updates: Partial<Employee>): Pr
   if (updates.paidPtoLimitHours !== undefined) row.paid_pto_limit_hours = updates.paidPtoLimitHours;
   if (updates.hireDate !== undefined) row.hire_date = updates.hireDate;
   if (updates.department !== undefined) row.department = updates.department;
+  if (updates.departmentId !== undefined) row.department_id = updates.departmentId;
   const { error } = await supabase.from('employees').update(row).eq('id', id);
   if (error) throw error;
 }
@@ -260,4 +263,35 @@ export async function getClockPolicy(): Promise<{ enabled: boolean; ips: string[
 export async function setClockPolicy(enabled: boolean, ips: string[]): Promise<void> {
   const { error } = await supabase.rpc('set_clock_policy', { p_enabled: enabled, p_ips: ips });
   if (error) throw error;
+}
+
+function toDepartment(r: Record<string, unknown>): Department {
+  return { id: r.id as string, name: r.name as string, managerEmployeeId: (r.manager_employee_id as string | null) ?? undefined };
+}
+/** Returns [] if the departments table is not available yet. */
+export async function getDepartments(): Promise<Department[]> {
+  const { data, error } = await supabase.from('departments').select('*').order('name');
+  if (error) return [];
+  return (data ?? []).map(toDepartment);
+}
+export async function addDepartment(name: string): Promise<void> {
+  const { error } = await supabase.from('departments').insert({ name: name.trim() });
+  if (error) throw error;
+}
+export async function updateDepartment(id: string, updates: { name?: string; managerEmployeeId?: string | null }): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (updates.name !== undefined) row.name = updates.name.trim();
+  if (updates.managerEmployeeId !== undefined) row.manager_employee_id = updates.managerEmployeeId;
+  const { error } = await supabase.from('departments').update(row).eq('id', id);
+  if (error) throw error;
+}
+export async function deleteDepartment(id: string): Promise<void> {
+  const { error } = await supabase.from('departments').delete().eq('id', id);
+  if (error) throw error;
+}
+/** Company directory without pay data (managers and directors). Falls back to [] if unavailable. */
+export async function getDirectory(): Promise<{ id: string; name: string; departmentId?: string; role: Employee['role'] }[]> {
+  const { data, error } = await supabase.from('employee_directory').select('*').order('name');
+  if (error) return [];
+  return (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, departmentId: (r.department_id as string | null) ?? undefined, role: r.role as Employee['role'] }));
 }

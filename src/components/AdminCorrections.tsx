@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle2, XCircle, FilePenLine, ScrollText, Loader2 } from 'lucide-react';
 
-interface Props { employees: Employee[]; onResolved?: () => void; }
+interface Props { employees: Employee[]; onResolved?: () => void; showAudit?: boolean; }
 
-export default function AdminCorrections({ employees, onResolved }: Props) {
+export default function AdminCorrections({ employees, onResolved, showAudit: canSeeAudit = true }: Props) {
   const [items, setItems] = useState<TimeCorrection[]>([]);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -19,10 +19,10 @@ export default function AdminCorrections({ employees, onResolved }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [c, a] = await Promise.all([getTimeCorrections(), getAuditLog(50)]);
+    const [c, a] = await Promise.all([getTimeCorrections(), canSeeAudit ? getAuditLog(50) : Promise.resolve([] as AuditEvent[])]);
     setItems(c.filter(x => x.status === 'pending'));
     setAudit(a);
-  }, []);
+  }, [canSeeAudit]);
   useEffect(() => { load(); }, [load]);
 
   const name = (id?: string) => employees.find(e => e.id === id)?.name ?? 'System';
@@ -75,7 +75,7 @@ export default function AdminCorrections({ employees, onResolved }: Props) {
         </div>
       )}
 
-      <div className="stat-card">
+      {canSeeAudit && <div className="stat-card">
         <button className="flex items-center gap-2 w-full text-left" onClick={() => setShowAudit(s => !s)}>
           <ScrollText className="h-5 w-5 text-primary" />
           <h3 className="text-base font-semibold">Audit Log</h3>
@@ -98,7 +98,7 @@ export default function AdminCorrections({ employees, onResolved }: Props) {
             </Table>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }
