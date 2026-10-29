@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getEmployees, getOrganizationName } from '@/lib/store';
-import { AppView, Employee } from '@/types/workforce';
+import { AppView, Employee, isDirectorRole } from '@/types/workforce';
 import EmployeeDashboard from '@/components/EmployeeDashboard';
 import AdminDashboard from '@/components/AdminDashboard';
 import { useAuth } from '@/lib/auth';
@@ -39,14 +39,15 @@ export default function Index() {
     })();
   }, [userId]);
 
-  // RLS guarantees a non-admin only receives their own row; admins receive all.
+  // RLS decides what each role receives: an employee gets their own row, a manager their team, a director everyone.
   const currentEmployee = employees.find(e => e.userId === userId);
-  const isAdmin = currentEmployee?.role === 'admin';
+  const isDirector = isDirectorRole(currentEmployee?.role);
+  const canManage = isDirector || currentEmployee?.role === 'manager';
 
   useEffect(() => {
-    if (isAdmin) setView('admin');
+    if (canManage) setView('admin');
     else setView('employee');
-  }, [isAdmin]);
+  }, [canManage]);
 
   if (authLoading) return null;
   if (recovering && session) return <ResetPassword />;
@@ -68,9 +69,9 @@ export default function Index() {
             <Button variant={view === 'employee' ? 'default' : 'ghost'} size="sm" onClick={() => setView('employee')}>
               <User className="h-4 w-4" /> Employee
             </Button>
-            {isAdmin && (
+            {canManage && (
               <Button variant={view === 'admin' ? 'default' : 'ghost'} size="sm" onClick={() => setView('admin')}>
-                <LayoutDashboard className="h-4 w-4" /> Admin
+                <LayoutDashboard className="h-4 w-4" /> {isDirector ? 'Admin' : 'Team'}
               </Button>
             )}
           </div>
@@ -101,7 +102,7 @@ export default function Index() {
         ) : view === 'employee' && currentEmployee ? (
           <EmployeeDashboard employee={currentEmployee} onEmployeeUpdate={async () => setEmployees(await getEmployees())} />
         ) : view === 'admin' ? (
-          <AdminDashboard onEmployeeChange={async () => setEmployees(await getEmployees())} />
+          <AdminDashboard currentEmployee={currentEmployee} onEmployeeChange={async () => setEmployees(await getEmployees())} />
         ) : (
           <p className="text-muted-foreground text-center py-20">Your account is not linked to an employee record. Contact your administrator.</p>
         )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getEmployees, getTimeEntries, getLeaveRequests, updateLeaveRequest, addEmployee, updateEmployee } from '@/lib/store';
-import { Employee, LeaveRequest } from '@/types/workforce';
+import { getEmployees, getTimeEntries, getLeaveRequests, updateLeaveRequest, addEmployee, updateEmployee, getDepartments } from '@/lib/store';
+import { Employee, LeaveRequest, Department, isDirectorRole, roleLabel } from '@/types/workforce';
 import { calculateDailySummary, calculatePayroll, getCurrentPeriod, getToday, formatCurrency, formatHours, formatDate } from '@/lib/calculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,13 +9,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import AdminCorrections from '@/components/AdminCorrections';
 import BillingBanner from '@/components/BillingBanner';
+import OrgStructure from '@/components/OrgStructure';
+import CompanyOverview from '@/components/CompanyOverview';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ClockNetworkSettings from '@/components/ClockNetworkSettings';
 import { Users, DollarSign, Download, PlusCircle, Edit, FileText, Clock, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 
-interface Props { onEmployeeChange?: () => void; }
+interface Props { currentEmployee?: Employee; onEmployeeChange?: () => void; }
 
-export default function AdminDashboard({ onEmployeeChange }: Props) {
+export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Props) {
+  const isDirector = isDirectorRole(currentEmployee?.role);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [payrolls, setPayrolls] = useState<ReturnType<typeof calculatePayroll>[]>([]);
   const [pending, setPending] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,18 +30,22 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [emps, timeEntries, leaveRequests] = await Promise.all([
-        getEmployees(), getTimeEntries(), getLeaveRequests(),
+      const [emps, timeEntries, leaveRequests, depts] = await Promise.all([
+        getEmployees(), getTimeEntries(), getLeaveRequests(), getDepartments(),
       ]);
       setEmployees(emps);
-      setPending(leaveRequests.filter(lr => lr.status === 'pending'));
+      setDepartments(depts);
+      // A manager can only act on their own team (and never on their own request); directors act on everyone.
+      const teamIds = new Set(emps.map(e => e.id));
+      setPending(leaveRequests.filter(lr => lr.status === 'pending'
+        && (isDirector || (teamIds.has(lr.employeeId) && lr.employeeId !== currentEmployee?.id))));
       setPayrolls(emps.map(emp => {
         const empEntries = timeEntries.filter(e => e.employeeId === emp.id);
         const dates = [...new Set(empEntries.filter(e => e.date.startsWith(period)).map(e => e.date))];
         return calculatePayroll(emp, dates.map(d => calculateDailySummary(empEntries, emp.id, d)), leaveRequests, period);
       }));
     } finally { setLoading(false); }
-  }, [period]);
+  }, [period, isDirector, currentEmployee?.id]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -71,7 +80,7 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', label: 'Employees', value: String(employees.length), sub: `${employees.filter(e=>e.role==='admin').length} admin` },
+          { icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', label: 'Employees', value: String(employees.length), sub: isDirector ? `${employees.filter(e => isDirectorRole(e.role)).length} director · ${employees.filter(e => e.role === 'manager').length} manager` : 'your team' },
           { icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50', label: `Hours — ${period}`, value: formatHours(totalHours), sub: `avg ${employees.length ? (totalHours/employees.length).toFixed(1) : 0}h/person` },
           { icon: DollarSign, color: 'text-primary', bg: 'bg-primary/10', label: 'Total Payroll', value: formatCurrency(totalPayroll), sub: period },
         ].map(({ icon: Icon, color, bg, label, value, sub }) => (
@@ -90,11 +99,15 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
         ))}
       </div>
 
-      <BillingBanner key={employees.length} />
+      {isDirector && <BillingBanner key={employees.length} />}
 
-      <ClockNetworkSettings />
+      {isDirector && <ClockNetworkSettings />}
 
-      <AdminCorrections employees={employees} onResolved={loadAll} />
+      {isDirector && <OrgStructure employees={employees} departments={departments} onChange={async () => { await loadAll(); onEmployeeChange?.(); }} />}
+
+      {!isDirector && <CompanyOverview teamIds={employees.map(e => e.id)} departments={departments} />}
+
+      <AdminCorrections employees={employees} onResolved={loadAll} showAudit={isDirector} />
 
       {/* Pending leave approvals */}
       {pending.length > 0 && (
@@ -189,7 +202,7 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">{employees.length} members</p>
           </div>
-          <AddEmployeeDialog onAdd={async () => { await loadAll(); onEmployeeChange?.(); }} />
+          <AddEmployeeDialog currentEmployee={currentEmployee} departments={departments} onAdd={async () => { await loadAll(); onEmployeeChange?.(); }} />
         </div>
         <div className="overflow-x-auto rounded-xl border border-border/60">
           <Table>
@@ -206,18 +219,18 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
                   <TableCell>
                     <div><p className="text-sm font-medium">{emp.name}</p><p className="text-xs text-muted-foreground">{emp.email}</p></div>
                   </TableCell>
-                  <TableCell className="text-sm">{emp.department}</TableCell>
+                  <TableCell className="text-sm">{departments.find(d => d.id === emp.departmentId)?.name ?? emp.department}</TableCell>
                   <TableCell className="font-mono text-sm font-semibold text-primary">{formatCurrency(emp.hourlyRate)}</TableCell>
                   <TableCell className="text-sm">{emp.paidPtoLimitHours}h</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{emp.vacationAccrualRate}d/mo</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(emp.hireDate)}</TableCell>
                   <TableCell>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${emp.role === 'admin' ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
-                      {emp.role}
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isDirectorRole(emp.role) ? 'bg-amber-50 text-amber-700' : emp.role === 'manager' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'}`}>
+                      {roleLabel(emp.role)}
                     </span>
                   </TableCell>
                   <TableCell>
-                    <EditEmployeeDialog employee={emp} onSave={async () => { await loadAll(); onEmployeeChange?.(); }} />
+                    <EditEmployeeDialog employee={emp} isDirector={isDirector} onSave={async () => { await loadAll(); onEmployeeChange?.(); }} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -229,7 +242,11 @@ export default function AdminDashboard({ onEmployeeChange }: Props) {
   );
 }
 
-function AddEmployeeDialog({ onAdd }: { onAdd: () => void }) {
+function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () => void; currentEmployee?: Employee; departments: Department[] }) {
+  const isDirector = isDirectorRole(currentEmployee?.role);
+  // a manager can only place new people in the departments they head
+  const allowed = isDirector ? departments : departments.filter(d => d.managerEmployeeId === currentEmployee?.id);
+  const [deptId, setDeptId] = useState('');
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -246,9 +263,11 @@ function AddEmployeeDialog({ onAdd }: { onAdd: () => void }) {
         vacationAccrualRate: parseFloat(f.vacationAccrualRate) || 0.416,
         paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || 40,
         hireDate: f.hireDate || getToday(),
-        department: f.department,
+        department: allowed.find(d => d.id === deptId)?.name ?? f.department,
+        departmentId: deptId || undefined,
       });
       setOpen(false);
+      setDeptId('');
       setF({ name:'', email:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
       onAdd();
     } catch (e) {
@@ -268,14 +287,24 @@ function AddEmployeeDialog({ onAdd }: { onAdd: () => void }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><Label>Full Name</Label><Input value={f.name} onChange={set('name')} placeholder="e.g. María García" /></div>
             <div className="col-span-2"><Label>Email</Label><Input value={f.email} onChange={set('email')} placeholder="maria@company.com" /></div>
-            <div><Label>Department</Label><Input value={f.department} onChange={set('department')} placeholder="Engineering" /></div>
+            <div>
+              <Label>Department</Label>
+              {departments.length > 0 ? (
+                <Select value={deptId} onValueChange={setDeptId}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>{allowed.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
+                </Select>
+              ) : (
+                <Input value={f.department} onChange={set('department')} placeholder="Engineering" />
+              )}
+            </div>
             <div><Label>Hire Date</Label><Input type="date" value={f.hireDate} onChange={set('hireDate')} /></div>
             <div><Label>Hourly Rate ($)</Label><Input type="number" step="0.01" value={f.hourlyRate} onChange={set('hourlyRate')} placeholder="35.00" /></div>
             <div><Label>PTO Limit (hrs/yr)</Label><Input type="number" value={f.paidPtoLimitHours} onChange={set('paidPtoLimitHours')} placeholder="40" /></div>
             <div className="col-span-2"><Label>Vacation Accrual (days/month)</Label><Input type="number" step="0.001" value={f.vacationAccrualRate} onChange={set('vacationAccrualRate')} placeholder="0.416" /></div>
           </div>
           {err && <p className="text-sm text-destructive">{err}</p>}
-          <Button className="w-full" onClick={submit} disabled={!f.name || !f.email || saving}>
+          <Button className="w-full" onClick={submit} disabled={!f.name || !f.email || saving || (departments.length > 0 && !deptId)}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Add Employee
           </Button>
         </div>
@@ -284,7 +313,7 @@ function AddEmployeeDialog({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function EditEmployeeDialog({ employee, onSave }: { employee: Employee; onSave: () => void }) {
+function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employee; onSave: () => void; isDirector: boolean }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [f, setF] = useState({
@@ -312,7 +341,7 @@ function EditEmployeeDialog({ employee, onSave }: { employee: Employee; onSave: 
         hourlyRate: parseFloat(f.hourlyRate) || employee.hourlyRate,
         paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || employee.paidPtoLimitHours,
         vacationAccrualRate: parseFloat(f.vacationAccrualRate) || employee.vacationAccrualRate,
-        department: f.department,
+        ...(isDirector && !employee.departmentId ? { department: f.department } : {}),
       });
       setOpen(false); onSave();
     } finally { setSaving(false); }
@@ -326,7 +355,7 @@ function EditEmployeeDialog({ employee, onSave }: { employee: Employee; onSave: 
       <DialogContent>
         <DialogHeader><DialogTitle>Edit — {employee.name}</DialogTitle></DialogHeader>
         <div className="space-y-3 pt-1">
-          <div><Label>Department</Label><Input value={f.department} onChange={set('department')} /></div>
+          {isDirector && !employee.departmentId && <div><Label>Department</Label><Input value={f.department} onChange={set('department')} /></div>}
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Hourly Rate ($)</Label><Input type="number" step="0.01" value={f.hourlyRate} onChange={set('hourlyRate')} /></div>
             <div><Label>PTO Limit (hrs/yr)</Label><Input type="number" value={f.paidPtoLimitHours} onChange={set('paidPtoLimitHours')} /></div>
