@@ -56,6 +56,7 @@ returns boolean language sql stable security definer set search_path = '' as $$
 $$;
 
 -- ¿El usuario en sesión es el manager del departamento de este empleado?
+-- Un director nunca queda "bajo" un manager, aunque figure en su departamento.
 create or replace function private.manages_employee(p_emp uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
   select exists (
@@ -64,6 +65,7 @@ returns boolean language sql stable security definer set search_path = '' as $$
     join public.departments d on d.id = e.department_id
     join public.employees m   on m.id = d.manager_employee_id
     where e.id = p_emp
+      and e.role <> 'director'
       and m.user_id = auth.uid()
       and m.role = 'manager'
       and m.org_id = e.org_id
@@ -102,6 +104,12 @@ create trigger departments_validate before insert or update on public.department
   for each row execute function private.validate_department();
 
 -- Quién puede cambiar qué en un empleado.
+--  * Nadie, desde la app, puede cambiar la empresa (org_id) de una fila ni el vínculo de login (user_id):
+--    es la garantía de aislamiento entre empresas.
+--  * El director cambia todo lo demás dentro de su empresa.
+--  * El manager, sobre las personas de su estructura (las que le permite la política de la tabla): puede cambiar
+--    su correo y su rol entre Employee y Manager (ascender/descender), pero no crear directores ni moverlas
+--    de departamento. A sí mismo no se puede editar (lo impide la política).
 -- SIN security definer: current_user = 'authenticated' solo en llamadas directas del cliente.
 create or replace function private.protect_employee_columns()
 returns trigger language plpgsql set search_path = '' as $$
@@ -109,11 +117,14 @@ begin
   if current_user = 'authenticated' then
     if new.org_id  is distinct from old.org_id  then raise exception 'organization cannot be changed'; end if;
     if new.user_id is distinct from old.user_id then raise exception 'login link cannot be changed'; end if;
-    if not private.is_admin() and (
-         new.role is distinct from old.role
-         or new.department_id is distinct from old.department_id
-         or lower(new.email) is distinct from lower(old.email)) then
-      raise exception 'only a director can change role, department or email';
+    if not private.is_admin() then
+      if new.department_id is distinct from old.department_id then
+        raise exception 'only a director can move people between departments';
+      end if;
+      if new.role is distinct from old.role
+         and (old.role not in ('employee','manager') or new.role not in ('employee','manager')) then
+        raise exception 'a manager can only set the role to Employee or Manager';
+      end if;
     end if;
   end if;
   return new;

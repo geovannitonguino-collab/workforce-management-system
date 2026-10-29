@@ -230,7 +230,9 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
                     </span>
                   </TableCell>
                   <TableCell>
-                    <EditEmployeeDialog employee={emp} isDirector={isDirector} onSave={async () => { await loadAll(); onEmployeeChange?.(); }} />
+                    {(isDirector || emp.id !== currentEmployee?.id) && (
+                      <EditEmployeeDialog employee={emp} isDirector={isDirector} onSave={async () => { await loadAll(); onEmployeeChange?.(); }} />
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -319,7 +321,11 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
   const [f, setF] = useState({
     hourlyRate: String(employee.hourlyRate), paidPtoLimitHours: String(employee.paidPtoLimitHours),
     vacationAccrualRate: String(employee.vacationAccrualRate), department: employee.department,
+    email: employee.email,
   });
+  const currentRole: 'director' | 'manager' | 'employee' = isDirectorRole(employee.role) ? 'director' : employee.role;
+  const [role, setRole] = useState<'director' | 'manager' | 'employee'>(currentRole);
+  const [err, setErr] = useState<string | null>(null);
 
   // Bug fix #7: reset form state whenever the dialog opens (or the employee prop
   // changes while open). The dialog wrapper never unmounts on close, so without this
@@ -329,21 +335,33 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
     setF({
       hourlyRate: String(employee.hourlyRate), paidPtoLimitHours: String(employee.paidPtoLimitHours),
       vacationAccrualRate: String(employee.vacationAccrualRate), department: employee.department,
+      email: employee.email,
     });
+    setRole(isDirectorRole(employee.role) ? 'director' : employee.role);
+    setErr(null);
   }, [open, employee]);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setF(prev => ({ ...prev, [k]: e.target.value }));
 
   const submit = async () => {
-    setSaving(true);
+    setSaving(true); setErr(null);
     try {
       await updateEmployee(employee.id, {
         hourlyRate: parseFloat(f.hourlyRate) || employee.hourlyRate,
         paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || employee.paidPtoLimitHours,
         vacationAccrualRate: parseFloat(f.vacationAccrualRate) || employee.vacationAccrualRate,
         ...(isDirector && !employee.departmentId ? { department: f.department } : {}),
+        ...(f.email.trim() && f.email.trim().toLowerCase() !== employee.email.toLowerCase() ? { email: f.email.trim() } : {}),
+        ...(role !== currentRole ? { role } : {}),
       });
       setOpen(false); onSave();
+    } catch (e) {
+      const m = String((e as { message?: string })?.message ?? '');
+      setErr(
+        m.includes('at least one director') ? 'The organization must keep at least one director.'
+        : m.includes('only set the role') ? 'A manager can only set the role to Employee or Manager.'
+        : m.includes('duplicate') || m.includes('uniq') ? 'Another person in the company already uses that email.'
+        : 'Could not save the change.');
     } finally { setSaving(false); }
   };
 
@@ -356,11 +374,28 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
         <DialogHeader><DialogTitle>Edit — {employee.name}</DialogTitle></DialogHeader>
         <div className="space-y-3 pt-1">
           {isDirector && !employee.departmentId && <div><Label>Department</Label><Input value={f.department} onChange={set('department')} /></div>}
+          <div>
+            <Label>Email</Label>
+            <Input type="email" value={f.email} onChange={set('email')} />
+            {employee.userId && <p className="text-xs text-muted-foreground mt-1">This person already has a login; their sign-in email does not change.</p>}
+          </div>
+          <div>
+            <Label>Role</Label>
+            <Select value={role} onValueChange={v => setRole(v as typeof role)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {isDirector && <SelectItem value="director">Director</SelectItem>}
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="employee">Employee</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Hourly Rate ($)</Label><Input type="number" step="0.01" value={f.hourlyRate} onChange={set('hourlyRate')} /></div>
             <div><Label>PTO Limit (hrs/yr)</Label><Input type="number" value={f.paidPtoLimitHours} onChange={set('paidPtoLimitHours')} /></div>
           </div>
           <div><Label>Vacation Accrual (days/month)</Label><Input type="number" step="0.001" value={f.vacationAccrualRate} onChange={set('vacationAccrualRate')} /></div>
+          {err && <p className="text-sm text-destructive">{err}</p>}
           <Button className="w-full" onClick={submit} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Save Changes
           </Button>
