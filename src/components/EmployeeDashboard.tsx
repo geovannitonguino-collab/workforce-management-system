@@ -2,6 +2,8 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Employee } from '@/types/workforce';
 import { formatDate, getToday } from '@/lib/calculations';
 import { getContracts } from '@/lib/store';
+import ContractDialog from '@/components/ContractDialog';
+import { Button } from '@/components/ui/button';
 import { ContractRecord } from '@/types/contract';
 import { formatMoney } from '@/lib/payrollRun';
 import TimeClock from '@/components/TimeClock';
@@ -22,6 +24,7 @@ export default function EmployeeDashboard({ employee: baseEmployee, onEmployeeUp
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
   const [contract, setContract] = useState<ContractRecord | null | undefined>(undefined); // undefined = still loading
+  const [showContract, setShowContract] = useState(false);
 
   // The contract in force today is the single source for pay, vacation and PTO.
   useEffect(() => {
@@ -55,9 +58,10 @@ export default function EmployeeDashboard({ employee: baseEmployee, onEmployeeUp
           </div>
         </div>
         {contract && (
-          <div className="text-right">
+          <div className="text-right space-y-1">
             <p className="text-2xl font-bold text-primary">{formatMoney(contract.amount, contract.currency)}</p>
             <p className="text-xs text-muted-foreground">{contract.payType === 'hourly' ? 'per hour' : `per ${({ weekly: 'week', biweekly: '2 weeks', semimonthly: 'half month', monthly: 'month' } as const)[contract.payPeriod]}`}</p>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowContract(true)}>My contract</Button>
           </div>
         )}
       </div>
@@ -77,6 +81,7 @@ export default function EmployeeDashboard({ employee: baseEmployee, onEmployeeUp
           <LeaveHistory key={`history-${refreshKey}`} employee={employee} />
         </div>
       </div>
+      <ContractDialog employee={showContract ? baseEmployee : null} canEdit={false} onClose={() => setShowContract(false)} />
     </div>
   );
 }

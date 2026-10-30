@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Employee } from '@/types/workforce';
 import {
-  ContractFormValues, ContractRecord, DeductionLine, PayPeriod, Surcharges, SUGGESTED_CONTRACT_TYPES, Weekday,
+  ContractDocument, ContractFormValues, ContractRecord, DeductionLine, PayPeriod, Surcharges, SUGGESTED_CONTRACT_TYPES, Weekday,
 } from '@/types/contract';
-import { addContract, getContracts, getOrganizationName, getOrgSettings, updateContract } from '@/lib/store';
+import {
+  addContract, addContractDocument, deleteContractDocument, getContractDocuments, getContractDocumentUrl, getContracts,
+  getOrganizationName, getOrgSettings, updateContract,
+} from '@/lib/store';
 import { buildContractSummaryHtml, printHtml } from '@/lib/printDocs';
 import { blankContract } from '@/lib/contractDefaults';
 import { weeklyHours } from '@/lib/payrollEngine';
@@ -17,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Loader2, Plus, Printer, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, Loader2, Plus, Printer, Trash2, Upload } from 'lucide-react';
 
 const NEW = '__new__';
 const DAYS: { d: Weekday; label: string }[] = [
@@ -119,6 +122,74 @@ function DeductionEditor({ lines, onChange, disabled }: { lines: DeductionLine[]
         <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => onChange([...lines, { ...BLANK_LINE }])}><Plus className="h-3.5 w-3.5" /> Add a line</Button>
       )}
     </div>
+  );
+}
+
+const MAX_CONTRACT_FILE = 10 * 1024 * 1024;
+
+/** Signed contract PDFs of this person, kept in private storage and opened through a short-lived link. */
+function ContractFiles({ employeeId, canEdit }: { employeeId: string; canEdit: boolean }) {
+  const [docs, setDocs] = useState<ContractDocument[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => setDocs(await getContractDocuments(employeeId)), [employeeId]);
+  useEffect(() => { load(); }, [load]);
+
+  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    if (file.type !== 'application/pdf') { setError('Only PDF files are accepted.'); e.target.value = ''; return; }
+    if (file.size > MAX_CONTRACT_FILE) { setError('The file is larger than 10 MB.'); e.target.value = ''; return; }
+    setBusy(true);
+    try { await addContractDocument(employeeId, file, note); setNote(''); await load(); }
+    catch { setError('Could not upload the file. Try again.'); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+  const open = async (d: ContractDocument) => {
+    setError(null);
+    try { window.open(await getContractDocumentUrl(d), '_blank', 'noopener'); } catch { setError('Could not open the file.'); }
+  };
+  const remove = async (d: ContractDocument) => {
+    if (!window.confirm(`Delete "${d.fileName}"? This cannot be undone.`)) return;
+    setBusy(true); setError(null);
+    try { await deleteContractDocument(d); await load(); } catch { setError('Could not delete the file.'); } finally { setBusy(false); }
+  };
+
+  return (
+    <section className="space-y-3">
+      <h4 className="text-sm font-semibold">Signed contract files</h4>
+      {docs === null ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        : docs.length === 0 ? <p className="text-xs text-muted-foreground">No files uploaded yet.</p>
+        : (
+          <div className="space-y-2">
+            {docs.map(d => (
+              <div key={d.id} className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{d.fileName}</p>
+                  <p className="text-xs text-muted-foreground">{d.uploadedAt.slice(0, 10)}{d.note ? ` · ${d.note}` : ''}</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" className="h-8 gap-1" onClick={() => open(d)}><ExternalLink className="h-3.5 w-3.5" /> Open</Button>
+                {canEdit && <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive" aria-label={`Delete ${d.fileName}`} disabled={busy} onClick={() => remove(d)}><Trash2 className="h-4 w-4" /></Button>}
+              </div>
+            ))}
+          </div>
+        )}
+      {canEdit && (
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex-1 min-w-[12rem]"><Label className="text-xs">Note (optional)</Label><Input value={note} maxLength={300} placeholder="e.g. Signed on 3 March" onChange={e => setNote(e.target.value)} /></div>
+          <input ref={fileRef} type="file" accept="application/pdf" className="hidden" data-testid="contract-file-input" onChange={upload} />
+          <Button type="button" variant="outline" className="gap-1" disabled={busy} onClick={() => fileRef.current?.click()}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload PDF
+          </Button>
+        </div>
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <p className="text-xs text-muted-foreground">PDF only, up to 10 MB. Files are private: only this person, their manager and the directors can open them.</p>
+    </section>
   );
 }
 
@@ -455,6 +526,8 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
               <Label>Note (optional)</Label>
               <Textarea rows={2} value={form.note ?? ''} disabled={!canEdit} onChange={e => set('note', e.target.value)} placeholder="Anything worth remembering about this agreement" />
             </div>
+
+            <ContractFiles employeeId={employee.id} canEdit={canEdit} />
 
             {error && <p className="text-sm text-destructive">{error}</p>}
             {saved && <p className="text-sm text-emerald-600">Saved.</p>}
