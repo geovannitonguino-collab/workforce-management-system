@@ -158,7 +158,7 @@ export function calculatePay(input: PayrollInput): PayrollResult {
       const kind: HourKind = ot
         ? (holiday ? (night ? 'otHolidayNight' : 'otHolidayDay') : (night ? 'otNight' : 'otDay'))
         : (holiday ? (night ? 'holidayNight' : 'holiday') : (night ? 'night' : 'ordinary'));
-      const pct = kind === 'ordinary' ? 0 : terms.surcharges[kind] / 100;
+      const pct = kind === 'ordinary' ? 0 : (terms.surcharges[kind] ?? 0) / 100;
 
       hours[kind] += w / 60;
       dayMin.set(shiftDate, dm + w);
