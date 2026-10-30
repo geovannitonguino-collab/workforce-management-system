@@ -19,12 +19,19 @@ const addContract = vi.fn(async (employeeId: string, form: Record<string, unknow
   stored.unshift(rec);
   return rec;
 });
+const docs: Record<string, unknown>[] = [];
+const addContractDocument = vi.fn(async (employeeId: string, file: File, note?: string) => { docs.push({ id: 'd' + docs.length, employeeId, fileName: file.name, storagePath: employeeId + '/x.pdf', note, uploadedAt: '2026-10-30T10:00:00Z' }); });
+const deleteContractDocument = vi.fn(async (d: { id: string }) => { const i = docs.findIndex(x => x.id === d.id); if (i >= 0) docs.splice(i, 1); });
 const updateContract = vi.fn(async (id: string, form: Record<string, unknown>) => ({ ...(form as object), id, employeeId: 'e1', createdAt: '' } as unknown as ContractRecord));
 
 vi.mock('@/lib/store', () => ({
   getContracts: vi.fn(async () => [...stored]),
   getOrgSettings: vi.fn(async () => ({ timeZone: 'America/Bogota', defaultCurrency: 'COP' })),
   getOrganizationName: vi.fn(async () => 'Acme SAS'),
+  getContractDocuments: vi.fn(async () => [...docs]),
+  addContractDocument: (...a: Parameters<typeof addContractDocument>) => addContractDocument(...a),
+  deleteContractDocument: (...a: Parameters<typeof deleteContractDocument>) => deleteContractDocument(...a),
+  getContractDocumentUrl: vi.fn(async () => 'https://files.example/signed'),
   addContract: (...a: Parameters<typeof addContract>) => addContract(...a),
   updateContract: (...a: Parameters<typeof updateContract>) => updateContract(...a),
 }));
@@ -69,7 +76,7 @@ async function type(el: HTMLInputElement, value: string) {
   });
 }
 
-beforeEach(() => { stored.length = 0; addContract.mockClear(); updateContract.mockClear(); });
+beforeEach(() => { stored.length = 0; docs.length = 0; addContract.mockClear(); updateContract.mockClear(); addContractDocument.mockClear(); deleteContractDocument.mockClear(); });
 afterEach(async () => { await act(async () => { root?.unmount(); }); host?.remove(); document.body.innerHTML = ''; root = null; host = null; });
 
 describe('ContractDialog', () => {
@@ -159,6 +166,60 @@ describe('ContractDialog', () => {
     await click('Save changes');
     await waitFor(() => hasText('more than 100'));
     expect(updateContract).not.toHaveBeenCalled();
+  });
+
+  it('uploads a signed PDF for the person and lists it', async () => {
+    stored.push(existing());
+    await mount(<ContractDialog employee={emp} canEdit onClose={() => {}} />);
+    await waitFor(() => hasText('No files uploaded yet'));
+    const input = document.body.querySelector<HTMLInputElement>('[data-testid="contract-file-input"]')!;
+    const file = new File(['%PDF-1.4'], 'contract-ana.pdf', { type: 'application/pdf' });
+    await act(async () => { Object.defineProperty(input, 'files', { value: [file], configurable: true }); input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await waitFor(() => expect(addContractDocument).toHaveBeenCalledTimes(1));
+    expect((addContractDocument.mock.calls[0] as unknown as [string])[0]).toBe('e1');
+    await waitFor(() => hasText('contract-ana.pdf'));
+  });
+
+  it('refuses a file that is not a PDF, or is larger than 10 MB, before uploading anything', async () => {
+    stored.push(existing());
+    await mount(<ContractDialog employee={emp} canEdit onClose={() => {}} />);
+    await waitFor(() => hasText('No files uploaded yet'));
+    const input = document.body.querySelector<HTMLInputElement>('[data-testid="contract-file-input"]')!;
+    const send = (f: File) => act(async () => { Object.defineProperty(input, 'files', { value: [f], configurable: true }); input.dispatchEvent(new Event('change', { bubbles: true })); });
+    await send(new File(['x'], 'photo.png', { type: 'image/png' }));
+    await waitFor(() => hasText('Only PDF files are accepted'));
+    const big = new File(['x'], 'big.pdf', { type: 'application/pdf' });
+    Object.defineProperty(big, 'size', { value: 11 * 1024 * 1024 });
+    await send(big);
+    await waitFor(() => hasText('larger than 10 MB'));
+    expect(addContractDocument).not.toHaveBeenCalled();
+  });
+
+  it('opens a file through a short-lived link, and deleting asks first', async () => {
+    stored.push(existing());
+    docs.push({ id: 'd0', employeeId: 'e1', fileName: 'signed.pdf', storagePath: 'e1/a.pdf', uploadedAt: '2026-10-01T00:00:00Z' });
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    await mount(<ContractDialog employee={emp} canEdit onClose={() => {}} />);
+    await waitFor(() => hasText('signed.pdf'));
+    await click('Open');
+    await waitFor(() => expect(openSpy).toHaveBeenCalledWith('https://files.example/signed', '_blank', 'noopener'));
+    await act(async () => { (document.body.querySelector('button[aria-label="Delete signed.pdf"]') as HTMLElement).click(); });
+    expect(deleteContractDocument).not.toHaveBeenCalled();            // first answer: cancel
+    await act(async () => { (document.body.querySelector('button[aria-label="Delete signed.pdf"]') as HTMLElement).click(); });
+    await waitFor(() => expect(deleteContractDocument).toHaveBeenCalledTimes(1));
+    await waitFor(() => hasText('No files uploaded yet'));
+    openSpy.mockRestore(); confirmSpy.mockRestore();
+  });
+
+  it('a person viewing their own contract can open files but not upload or delete', async () => {
+    stored.push(existing());
+    docs.push({ id: 'd0', employeeId: 'e1', fileName: 'signed.pdf', storagePath: 'e1/a.pdf', uploadedAt: '2026-10-01T00:00:00Z' });
+    await mount(<ContractDialog employee={emp} canEdit={false} onClose={() => {}} />);
+    await waitFor(() => hasText('signed.pdf'));
+    hasText('Open');
+    expect(findText('Upload PDF')).toBeUndefined();
+    expect(document.body.querySelector('button[aria-label="Delete signed.pdf"]')).toBeNull();
   });
 
   it('is read-only when the viewer cannot edit', async () => {

@@ -148,3 +148,14 @@ export interface OrgSettings {
   country?: string;
   defaultCurrency?: string;
 }
+
+/** A signed contract file (PDF) kept in private storage. */
+export interface ContractDocument {
+  id: string;
+  employeeId: string;
+  fileName: string;
+  storagePath: string;
+  note?: string;
+  uploadedBy?: string;
+  uploadedAt: string;
+}

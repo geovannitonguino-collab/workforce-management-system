@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { AdjustmentKind, DeductionLine, ContractFormValues, ContractRecord, OrgSettings, Weekday, Surcharges } from '@/types/contract';
+import type { AdjustmentKind, ContractDocument, DeductionLine, ContractFormValues, ContractRecord, OrgSettings, Weekday, Surcharges } from '@/types/contract';
 import type { PayAdjustmentRecord } from '@/lib/payrollRun';
 import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, BillingStatus, Department, CorrectionKind, ClockAction } from '@/types/workforce';
 
@@ -426,4 +426,42 @@ export async function getPlans(): Promise<PlanInfo[]> {
     baseCop: r.base_cop == null ? undefined : Number(r.base_cop), perPersonCop: r.per_person_cop == null ? undefined : Number(r.per_person_cop),
     sortOrder: Number(r.sort_order ?? 0),
   })).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+// ---------------------------------------------------------------- signed contract files (private storage)
+const CONTRACT_BUCKET = 'contract-files';
+
+function toContractDocument(r: Record<string, unknown>): ContractDocument {
+  return {
+    id: r.id as string, employeeId: r.employee_id as string, fileName: r.file_name as string, storagePath: r.storage_path as string,
+    note: (r.note as string | null) ?? undefined, uploadedBy: (r.uploaded_by as string | null) ?? undefined, uploadedAt: r.uploaded_at as string,
+  };
+}
+export async function getContractDocuments(employeeId: string): Promise<ContractDocument[]> {
+  const { data, error } = await supabase.from('contract_documents').select('*').eq('employee_id', employeeId).order('uploaded_at', { ascending: false });
+  if (error) return [];
+  return (data ?? []).map(toContractDocument);
+}
+export async function addContractDocument(employeeId: string, file: File, note?: string): Promise<void> {
+  const path = `${employeeId}/${crypto.randomUUID()}.pdf`;
+  const up = await supabase.storage.from(CONTRACT_BUCKET).upload(path, file, { contentType: 'application/pdf' });
+  if (up.error) throw up.error;
+  const { error } = await supabase.from('contract_documents').insert({
+    employee_id: employeeId, file_name: file.name.slice(0, 200), storage_path: path, note: note?.trim() || null,
+  });
+  if (error) {
+    await supabase.storage.from(CONTRACT_BUCKET).remove([path]);
+    throw error;
+  }
+}
+export async function deleteContractDocument(doc: ContractDocument): Promise<void> {
+  const { error } = await supabase.from('contract_documents').delete().eq('id', doc.id);
+  if (error) throw error;
+  await supabase.storage.from(CONTRACT_BUCKET).remove([doc.storagePath]);
+}
+/** Short-lived link (5 minutes) to open a private contract file. */
+export async function getContractDocumentUrl(doc: ContractDocument): Promise<string> {
+  const { data, error } = await supabase.storage.from(CONTRACT_BUCKET).createSignedUrl(doc.storagePath, 300);
+  if (error) throw error;
+  return data.signedUrl;
 }
