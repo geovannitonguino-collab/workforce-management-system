@@ -12,6 +12,8 @@ const CAT_CONFIG: Record<string, { label: string; color: string }> = {
   sick:     { label: 'Sick Leave', color: 'hsl(24,85%,48%)' },
   vacation: { label: 'Vacation',   color: 'hsl(152,60%,40%)' },
   personal: { label: 'Personal',   color: 'hsl(270,60%,50%)' },
+  family:   { label: 'Family Day', color: 'hsl(330,70%,50%)' },
+  other:    { label: 'Other',      color: 'hsl(215,15%,50%)' },
 };
 const STATUS_COLORS: Record<string, string> = {
   approved: 'hsl(152,60%,40%)', pending: 'hsl(38,92%,50%)', rejected: 'hsl(0,72%,51%)',
@@ -39,7 +41,7 @@ export default function LeaveAnalytics({ employee }: Props) {
   );
 
   const byMonth = useMemo(() => {
-    const data = MONTHS.map(m => ({ month: m, pto: 0, sick: 0, vacation: 0, personal: 0 } as Record<string, string|number>));
+    const data = MONTHS.map(m => ({ month: m, pto: 0, sick: 0, vacation: 0, personal: 0, family: 0, other: 0 } as Record<string, string|number>));
     thisYear.forEach(r => {
       const idx = new Date(r.startDate).getMonth();
       if (data[idx]) (data[idx][r.category] as number) += r.hours;

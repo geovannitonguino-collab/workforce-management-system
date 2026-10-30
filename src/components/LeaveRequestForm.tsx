@@ -69,7 +69,9 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
   const preview = balance && hoursNum > 0 && !vacationError
     ? calculateLeaveRequestPaidStatus({ category, hours: hoursNum, usesPtoBalance }, balance) : null;
 
-  const canSubmit = startDate && endDate && !dateError && hoursNum > 0 && !vacationError && !sickProofRequired && !saving && balance;
+  const usesPtoOption = category === 'personal' || category === 'family' || category === 'other';
+  const otherReasonMissing = category === 'other' && reason.trim().length < 3;
+  const canSubmit = startDate && endDate && !dateError && hoursNum > 0 && !vacationError && !sickProofRequired && !otherReasonMissing && !saving && balance;
 
   // Bug fix #8: memoized so MedicalProofManager's effect (which depends on onUpdate) doesn't re-run every render
   const handleProofUpdate = useCallback(async () => {
@@ -87,7 +89,7 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
         id: draftId, employeeId: employee.id, category,
         startDate, endDate, hours: hoursNum,
         isPaid: paidStatus.isPaid, unpaidHours: paidStatus.unpaidHours,
-        status: 'pending', reason, usesPtoBalance: category === 'personal' ? usesPtoBalance : undefined,
+        status: 'pending', reason, usesPtoBalance: usesPtoOption ? usesPtoBalance : undefined,
         createdAt: new Date().toISOString(),
       });
       // Reset form + generate fresh draftId for next request
@@ -119,6 +121,8 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
               <SelectItem value="sick">Sick Leave</SelectItem>
               <SelectItem value="vacation">Vacation (from accrued balance)</SelectItem>
               <SelectItem value="personal">Personal Issues</SelectItem>
+              <SelectItem value="family">Family Day</SelectItem>
+              <SelectItem value="other">Other (explain in the reason)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -143,10 +147,10 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
           </div>
         )}
 
-        {category === 'personal' && (
+        {usesPtoOption && (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
             <ShieldAlert className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-            <p className="text-sm">Personal leave is <strong>unpaid by default</strong>. You may opt to use PTO balance.</p>
+            <p className="text-sm">This leave is <strong>unpaid by default</strong>. You may opt to use PTO balance.</p>
           </div>
         )}
 
@@ -183,7 +187,7 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
           )}
         </div>
 
-        {category === 'personal' && (
+        {usesPtoOption && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
             <Label htmlFor="use-pto" className="text-sm cursor-pointer">Use PTO balance instead?</Label>
             <Switch id="use-pto" checked={usesPtoBalance} onCheckedChange={setUsesPtoBalance} />
@@ -210,8 +214,8 @@ export default function LeaveRequestForm({ employee, onSubmit }: Props) {
         )}
 
         <div>
-          <Label>Reason</Label>
-          <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Brief description..." rows={2} />
+          <Label>Reason{category === 'other' && <span className="text-destructive font-semibold"> (required for Other)</span>}</Label>
+          <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder={category === 'other' ? 'Explain what this leave is for...' : 'Brief description...'} rows={2} />
         </div>
 
         {vacationError && (

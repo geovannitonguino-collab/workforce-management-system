@@ -9,16 +9,17 @@ import { History, FileText, Eye, Calendar, Clock, X, Filter, Download, Loader2 }
 
 interface Props { employee: Employee; }
 
-const catLabels: Record<string, string> = { pto: 'PTO', sick: 'Sick Leave', vacation: 'Vacation', personal: 'Personal' };
+const catLabels: Record<string, string> = { pto: 'PTO', sick: 'Sick Leave', vacation: 'Vacation', personal: 'Personal', family: 'Family Day', other: 'Other' };
 const catColors: Record<string, string> = {
   pto: 'bg-blue-100 text-blue-800', sick: 'bg-orange-100 text-orange-800',
   vacation: 'bg-emerald-100 text-emerald-800', personal: 'bg-purple-100 text-purple-800',
+  family: 'bg-pink-100 text-pink-800', other: 'bg-slate-100 text-slate-800',
 };
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive'> = {
   approved: 'default', pending: 'secondary', rejected: 'destructive',
 };
 
-const CATS = ['all', 'pto', 'sick', 'vacation', 'personal'] as const;
+const CATS = ['all', 'pto', 'sick', 'vacation', 'personal', 'family', 'other'] as const;
 const STATS = ['all', 'pending', 'approved', 'rejected'] as const;
 
 function exportCSV(requests: LeaveRequest[], name: string) {

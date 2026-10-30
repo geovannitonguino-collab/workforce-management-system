@@ -140,7 +140,7 @@ export function calculateLeaveRequestPaidStatus(
 
   if (category === 'vacation') return { isPaid: true, unpaidHours: 0 };
 
-  if (category === 'personal') {
+  if (category === 'personal' || category === 'family' || category === 'other') {
     if (usesPtoBalance && balance.remainingPaidPtoHours > 0) {
       const covered = Math.min(hours, balance.remainingPaidPtoHours);
       return { isPaid: covered > 0, unpaidHours: round4(hours - covered) };
