@@ -31,6 +31,7 @@ vi.mock('@/lib/store', () => ({
   getPayAdjustments: vi.fn(async () => [...adjustments]),
   getHolidays: vi.fn(async () => []),
   getOrgSettings: vi.fn(async () => ({ timeZone: 'America/Bogota' })),
+  getOrganizationName: vi.fn(async () => 'Acme SAS'),
   addPayAdjustment: (...a: Parameters<typeof addPayAdjustment>) => addPayAdjustment(...a),
   deletePayAdjustment: (...a: Parameters<typeof deletePayAdjustment>) => deletePayAdjustment(...a),
 }));
@@ -130,6 +131,36 @@ describe('PayrollPanel', () => {
     expect(body.date >= '2026-10-01' && body.date <= '2026-10-31').toBe(true);
     // the new line is part of the total: 3000 base + 500
     await waitFor(() => hasText('$3,500.00'));
+  });
+
+  it('prints the payslip of the person in a new window, with the company name and the net pay', async () => {
+    const doc = { open: vi.fn(), write: vi.fn(), close: vi.fn() };
+    const win = { document: doc, focus: vi.fn(), print: vi.fn() };
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(win as unknown as Window);
+    await mount(<PayrollPanel {...props} />);
+    await waitFor(() => hasText('Ana Fixed'));
+    await clickText('Ana Fixed');
+    await waitFor(() => hasText('Print payslip'));
+    await clickText('Print payslip');
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    const html = doc.write.mock.calls[0][0] as string;
+    expect(html).toContain('Acme SAS');
+    expect(html).toContain('Ana Fixed');
+    expect(html).toContain('$3,000.00');
+    expect(html).toContain('Net pay / Pago neto');
+    await waitFor(() => expect(win.print).toHaveBeenCalled());
+    openSpy.mockRestore();
+  });
+
+  it('tells the person to allow pop-ups when the browser blocks the print window', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    await mount(<PayrollPanel {...props} />);
+    await waitFor(() => hasText('Ana Fixed'));
+    await clickText('Ana Fixed');
+    await waitFor(() => hasText('Print payslip'));
+    await clickText('Print payslip');
+    await waitFor(() => hasText('blocked the print window'));
+    openSpy.mockRestore();
   });
 
   it('a manager cannot add commissions to his own payroll row, but can view it', async () => {
