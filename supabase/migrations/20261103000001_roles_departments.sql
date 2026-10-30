@@ -220,8 +220,21 @@ create policy dept_delete on public.departments for delete to authenticated
 
 -- employees: ve su fila, el director ve todos, el manager ve a su equipo (las tarifas viven aquí)
 create policy employees_select on public.employees for select to authenticated
-  using (org_id = (select private.current_org_id())
-         and (user_id = (select auth.uid()) or (select private.is_admin()) or (select private.manages_employee(id))));
+  using (
+    org_id = (select private.current_org_id())
+    and (
+      user_id = (select auth.uid())
+      or (select private.is_admin())
+      or (select private.manages_employee(id))
+      -- igual que manages_employee pero con las columnas de la propia fila: necesario para que
+      -- "insert ... returning" funcione cuando un manager da de alta a alguien de su equipo
+      or (role <> 'director'
+          and department_id is not null
+          and exists (select 1 from public.departments d
+                      where d.id = department_id
+                        and d.manager_employee_id = (select private.current_employee_id())))
+    )
+  );
 create policy employees_insert on public.employees for insert to authenticated
   with check (
     org_id = (select private.current_org_id())
