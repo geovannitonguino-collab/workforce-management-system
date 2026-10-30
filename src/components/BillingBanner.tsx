@@ -36,7 +36,7 @@ export default function BillingBanner() {
         <p className="text-xs text-muted-foreground">{message}</p>
       </div>
       <button type="button" className="text-xs text-primary underline shrink-0" onClick={() => setPlansOpen(true)}>Change plan</button>
-      <PlansDialog open={plansOpen} currentPlanId={b.planId} onClose={() => setPlansOpen(false)} />
+      <PlansDialog open={plansOpen} currentPlanId={b.planId} people={b.employeeCount} onClose={() => setPlansOpen(false)} />
     </div>
   );
 }

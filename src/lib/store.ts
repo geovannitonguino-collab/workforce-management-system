@@ -401,7 +401,8 @@ export async function setOrgSettings(timeZone: string, country: string, currency
 // ---------------------------------------------------------------- plans
 export interface PlanInfo {
   id: string; name: string; description?: string; maxEmployees?: number; trialDays: number;
-  priceUsd?: number; priceCop?: number; sortOrder: number;
+  /** price = base + perPerson x number of people. A plan with no price shows "Contact us". */
+  baseUsd?: number; perPersonUsd?: number; baseCop?: number; perPersonCop?: number; sortOrder: number;
 }
 /** Plans offered by the provider. Prices are optional: a plan without price shows "Contact us". */
 export async function getPlans(): Promise<PlanInfo[]> {
@@ -410,7 +411,8 @@ export async function getPlans(): Promise<PlanInfo[]> {
   return (data ?? []).map(r => ({
     id: r.id as string, name: r.name as string, description: (r.description as string | null) ?? undefined,
     maxEmployees: (r.max_employees as number | null) ?? undefined, trialDays: Number(r.trial_days ?? 0),
-    priceUsd: r.price_usd == null ? undefined : Number(r.price_usd), priceCop: r.price_cop == null ? undefined : Number(r.price_cop),
+    baseUsd: r.base_usd == null ? undefined : Number(r.base_usd), perPersonUsd: r.per_person_usd == null ? undefined : Number(r.per_person_usd),
+    baseCop: r.base_cop == null ? undefined : Number(r.base_cop), perPersonCop: r.per_person_cop == null ? undefined : Number(r.per_person_cop),
     sortOrder: Number(r.sort_order ?? 0),
   })).sort((a, b) => a.sortOrder - b.sortOrder);
 }
