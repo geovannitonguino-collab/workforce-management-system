@@ -75,7 +75,8 @@ describe('contractor: an agreed fixed pay, no legal extras', () => {
       { date: '2026-11-02', kind: 'commission', amount: 9999 },
     ];
     const r = pay([contract({ payType: 'fixed', amount: 1000 })], [], { adjustments: adj });
-    expect(r.pay.commissions).toBe(620);
+    expect(r.pay.commissions).toBe(600);
+    expect(r.pay.reimbursements).toBe(20);
     expect(r.pay.deductions).toBe(50);
     expect(r.gross).toBeCloseTo(1570, 3);
   });
