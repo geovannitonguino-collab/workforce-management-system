@@ -7,6 +7,7 @@ import { addContract, getContracts, getOrgSettings, updateContract } from '@/lib
 import { blankContract } from '@/lib/contractDefaults';
 import { weeklyHours } from '@/lib/payrollEngine';
 import { getToday } from '@/lib/calculations';
+import { AMERICAS_CURRENCIES } from '@/lib/countries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,7 +19,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
 const NEW = '__new__';
-const CURRENCIES = ['USD', 'COP', 'CAD', 'MXN', 'ARS', 'CLP', 'PEN', 'BRL', 'UYU', 'EUR', 'GTQ', 'CRC', 'DOP', 'PAB'];
 const DAYS: { d: Weekday; label: string }[] = [
   { d: 1, label: 'Mon' }, { d: 2, label: 'Tue' }, { d: 3, label: 'Wed' }, { d: 4, label: 'Thu' },
   { d: 5, label: 'Fri' }, { d: 6, label: 'Sat' }, { d: 0, label: 'Sun' },
@@ -243,7 +243,7 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
                   <Label>Currency</Label>
                   <Input list="currencies" value={form.currency} maxLength={3} disabled={!canEdit}
                     onChange={e => set('currency', e.target.value.toUpperCase())} placeholder="USD" />
-                  <datalist id="currencies">{CURRENCIES.map(c => <option key={c} value={c} />)}</datalist>
+                  <datalist id="currencies">{AMERICAS_CURRENCIES.map(c => <option key={c} value={c} />)}</datalist>
                 </div>
               </div>
             </section>
