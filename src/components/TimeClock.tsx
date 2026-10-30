@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ClockStatus, ClockAction, TimeEntry } from '@/types/workforce';
-import { getTimeEntries, addTimeEntry, canClockHere } from '@/lib/store';
+import { getTimeEntries, addTimeEntry } from '@/lib/store';
 import { getToday, formatTime } from '@/lib/calculations';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -40,7 +40,6 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
   const [status, setStatus] = useState<ClockStatus>({ isClockedIn: false, isOnLunch: false, isOnBreak: false, todayEntries: [] });
   const [now, setNow] = useState(new Date());
   const [loading, setLoading] = useState(false);
-  const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -51,7 +50,6 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
   // Bug fix #9: reset timer when employeeId changes
   useEffect(() => {
     refresh();
-    canClockHere().then(ok => setBlocked(!ok));
     setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
@@ -63,10 +61,8 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
       await addTimeEntry({ employeeId, action, timestamp: new Date().toISOString(), date: getToday() });
       await refresh();
       onUpdate?.();
-    } catch (e) {
-      const msg = String((e as { message?: string })?.message ?? '');
-      if (msg.includes('clock:')) { setBlocked(true); setError('You can only clock in from the workplace network. / Solo puedes fichar desde la red del lugar de trabajo.'); }
-      else setError('Could not save the punch. Try again. / No se pudo guardar el fichaje. Inténtalo de nuevo.');
+    } catch {
+      setError('Could not save the punch. Try again. / No se pudo guardar el fichaje. Inténtalo de nuevo.');
     } finally { setLoading(false); }
   };
 
@@ -104,9 +100,9 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
 
   return (
     <div className="stat-card space-y-6">
-      {(blocked || error) && (
+      {error && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-800">
-          {error ?? 'You can only clock in from the workplace network. / Solo puedes fichar desde la red del lugar de trabajo.'}
+          {error}
           <span className="block text-xs mt-1">Forgot to punch? Use "Request correction". / ¿Olvidaste fichar? Usa "Request correction".</span>
         </div>
       )}

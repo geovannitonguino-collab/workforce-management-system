@@ -12,7 +12,6 @@ import BillingBanner from '@/components/BillingBanner';
 import OrgStructure from '@/components/OrgStructure';
 import CompanyOverview from '@/components/CompanyOverview';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import ClockNetworkSettings from '@/components/ClockNetworkSettings';
 import ContractDialog from '@/components/ContractDialog';
 import PayrollPanel from '@/components/PayrollPanel';
 import CompanyCalendar from '@/components/CompanyCalendar';
@@ -79,8 +78,6 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
       </div>
 
       {isDirector && <BillingBanner key={employees.length} />}
-
-      {isDirector && <ClockNetworkSettings />}
 
       {isDirector && <CompanyCalendar />}
 
