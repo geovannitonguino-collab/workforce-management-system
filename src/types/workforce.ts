@@ -38,7 +38,7 @@ export interface DailyTimeSummary {
   netWorkHours: number;
 }
 
-export type LeaveCategory = 'sick' | 'pto' | 'vacation' | 'personal';
+export type LeaveCategory = 'sick' | 'pto' | 'vacation' | 'personal' | 'family' | 'other';
 
 export interface MedicalProof {
   id: string;

@@ -64,7 +64,7 @@ export interface ContractTerms {
 }
 
 export type LeaveInput = {
-  category: 'sick' | 'pto' | 'vacation' | 'personal';
+  category: 'sick' | 'pto' | 'vacation' | 'personal' | 'family' | 'other';
   startDate: string;
   endDate: string;
   hours: number;

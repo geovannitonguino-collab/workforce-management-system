@@ -82,6 +82,12 @@ describe("calculateLeaveRequestPaidStatus", () => {
   it("pto with no balance is fully unpaid", () => {
     expect(calculateLeaveRequestPaidStatus({ category: "pto", hours: 8 }, balance(0))).toEqual({ isPaid: false, unpaidHours: 8 });
   });
+it("family day and 'other' follow the same rule as personal leave: unpaid unless PTO balance is used", () => {
+    for (const category of ["family", "other"] as const) {
+      expect(calculateLeaveRequestPaidStatus({ category, hours: 8 }, balance(40))).toEqual({ isPaid: false, unpaidHours: 8 });
+      expect(calculateLeaveRequestPaidStatus({ category, hours: 8, usesPtoBalance: true }, balance(4))).toEqual({ isPaid: true, unpaidHours: 4 });
+    }
+  });
   it("personal leave is unpaid unless it uses PTO balance", () => {
     expect(calculateLeaveRequestPaidStatus({ category: "personal", hours: 8 }, balance(40))).toEqual({ isPaid: false, unpaidHours: 8 });
     expect(calculateLeaveRequestPaidStatus({ category: "personal", hours: 8, usesPtoBalance: true }, balance(4))).toEqual({ isPaid: true, unpaidHours: 4 });
