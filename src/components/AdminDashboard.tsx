@@ -13,6 +13,7 @@ import OrgStructure from '@/components/OrgStructure';
 import CompanyOverview from '@/components/CompanyOverview';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ClockNetworkSettings from '@/components/ClockNetworkSettings';
+import ContractDialog from '@/components/ContractDialog';
 import { Users, DollarSign, Download, PlusCircle, Edit, FileText, Clock, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Props { currentEmployee?: Employee; onEmployeeChange?: () => void; }
@@ -21,6 +22,7 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
   const isDirector = isDirectorRole(currentEmployee?.role);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [contractFor, setContractFor] = useState<Employee | null>(null);
   const [payrolls, setPayrolls] = useState<ReturnType<typeof calculatePayroll>[]>([]);
   const [pending, setPending] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,7 +204,7 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">{employees.length} members</p>
           </div>
-          <AddEmployeeDialog currentEmployee={currentEmployee} departments={departments} onAdd={async () => { await loadAll(); onEmployeeChange?.(); }} />
+          <AddEmployeeDialog currentEmployee={currentEmployee} departments={departments} onAdd={async (created) => { await loadAll(); onEmployeeChange?.(); if (created) setContractFor(created); }} />
         </div>
         <div className="overflow-x-auto rounded-xl border border-border/60">
           <Table>
@@ -231,7 +233,12 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
                   </TableCell>
                   <TableCell>
                     {(isDirector || emp.id !== currentEmployee?.id) && (
-                      <EditEmployeeDialog employee={emp} isDirector={isDirector} onSave={async () => { await loadAll(); onEmployeeChange?.(); }} />
+                      <div className="flex items-center gap-1">
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1" title="Contract, pay and time off" onClick={() => setContractFor(emp)}>
+                          <FileText className="h-3.5 w-3.5" /> Contract
+                        </Button>
+                        <EditEmployeeDialog employee={emp} isDirector={isDirector} onSave={async () => { await loadAll(); onEmployeeChange?.(); }} />
+                      </div>
                     )}
                   </TableCell>
                 </TableRow>
@@ -240,11 +247,14 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
           </Table>
         </div>
       </div>
+
+      <ContractDialog employee={contractFor} canEdit={!!contractFor && (isDirector || contractFor.id !== currentEmployee?.id)}
+        onClose={() => setContractFor(null)} onSaved={() => onEmployeeChange?.()} />
     </div>
   );
 }
 
-function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () => void; currentEmployee?: Employee; departments: Department[] }) {
+function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: (created?: Employee) => void; currentEmployee?: Employee; departments: Department[] }) {
   const isDirector = isDirectorRole(currentEmployee?.role);
   // a manager can only place new people in the departments they head
   const allowed = isDirector ? departments : departments.filter(d => d.managerEmployeeId === currentEmployee?.id);
@@ -259,7 +269,7 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () 
     setSaving(true); setErr(null);
     try {
       // Bug fix #4: correct defaults — 0.416 days/mo and 40h PTO
-      await addEmployee({
+      const created = await addEmployee({
         name: f.name, email: f.email, personalEmail: f.personalEmail.trim() || undefined, role: 'employee',
         hourlyRate: parseFloat(f.hourlyRate) || 0,
         vacationAccrualRate: parseFloat(f.vacationAccrualRate) || 0.416,
@@ -271,7 +281,7 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: () 
       setOpen(false);
       setDeptId('');
       setF({ name:'', email:'', personalEmail:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
-      onAdd();
+      onAdd(created);
     } catch (e) {
       const msg = String((e as { message?: string })?.message ?? '');
       setErr(msg.includes('billing:') ? 'Your plan does not allow adding more employees (limit reached or subscription inactive). Contact contacto@geovannix.com.' : 'Could not add the employee. Check the data and try again.');

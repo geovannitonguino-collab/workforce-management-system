@@ -106,3 +106,22 @@ export interface PayAdjustment {
   amount: number;        // always positive; 'deduction' subtracts
   note?: string;
 }
+
+/** A contract version as stored: the terms plus bookkeeping fields. */
+export interface ContractRecord extends ContractTerms {
+  id: string;
+  employeeId: string;
+  tracksTime: boolean;   // false = this person does not need to clock hours
+  note?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+/** What the contract form edits and saves. */
+export type ContractFormValues = ContractTerms & { tracksTime: boolean; note?: string };
+
+export interface OrgSettings {
+  timeZone: string;
+  country?: string;
+  defaultCurrency?: string;
+}
