@@ -3,7 +3,8 @@ import { Employee } from '@/types/workforce';
 import {
   ContractFormValues, ContractRecord, DeductionLine, PayPeriod, Surcharges, SUGGESTED_CONTRACT_TYPES, Weekday,
 } from '@/types/contract';
-import { addContract, getContracts, getOrgSettings, updateContract } from '@/lib/store';
+import { addContract, getContracts, getOrganizationName, getOrgSettings, updateContract } from '@/lib/store';
+import { buildContractSummaryHtml, printHtml } from '@/lib/printDocs';
 import { blankContract } from '@/lib/contractDefaults';
 import { weeklyHours } from '@/lib/payrollEngine';
 import { getToday } from '@/lib/calculations';
@@ -16,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Plus, Printer, Trash2 } from 'lucide-react';
 
 const NEW = '__new__';
 const DAYS: { d: Weekday; label: string }[] = [
@@ -136,6 +137,8 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
   const [defaultCurrency, setDefaultCurrency] = useState('USD');
   const [advanced, setAdvanced] = useState(false);
   const [dedOpen, setDedOpen] = useState(false);
+  const [company, setCompany] = useState('');
+  const [blocked, setBlocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -157,8 +160,9 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
     if (!employee) return;
     let alive = true;
     (async () => {
-      const [list, org] = await Promise.all([getContracts(employee.id), getOrgSettings()]);
+      const [list, org, companyName] = await Promise.all([getContracts(employee.id), getOrgSettings(), getOrganizationName()]);
       if (!alive) return;
+      setCompany(companyName ?? '');
       const cur = org?.defaultCurrency || 'USD';
       setDefaultCurrency(cur);
       setVersions(list);
@@ -239,6 +243,13 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
                   ))}
                 </SelectContent>
               </Select>
+              {selected !== NEW && (
+                <Button type="button" size="sm" variant="outline" className="h-8 gap-1" onClick={() => {
+                  const v = versions.find(x => x.id === selected);
+                  if (v) setBlocked(!printHtml(buildContractSummaryHtml({ company, employee, contract: v })));
+                }}><Printer className="h-3.5 w-3.5" /> Print summary</Button>
+              )}
+              {blocked && <p className="text-xs text-destructive w-full">Your browser blocked the print window. Allow pop-ups for this site and try again.</p>}
               <p className="text-xs text-muted-foreground">Each version applies from its start date. Past payroll never changes when you add a new one.</p>
             </div>
 

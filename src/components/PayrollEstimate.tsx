@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Employee } from '@/types/workforce';
 import { Period } from '@/types/contract';
-import { getContracts, getHolidays, getLeaveRequests, getOrgSettings, getPayAdjustments, getTimeEntries } from '@/lib/store';
+import { getContracts, getHolidays, getLeaveRequests, getOrganizationName, getOrgSettings, getPayAdjustments, getTimeEntries } from '@/lib/store';
+import { buildPayslipHtml, printHtml } from '@/lib/printDocs';
 import { getToday } from '@/lib/calculations';
 import { formatMoney, runPayroll } from '@/lib/payrollRun';
 import { periodFor, periodLabel, shiftPeriod } from '@/lib/periods';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2 } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, DollarSign, Loader2, Printer } from 'lucide-react';
 
 interface Props { employee: Employee; }
 
@@ -14,14 +15,17 @@ interface Props { employee: Employee; }
 export default function PayrollEstimate({ employee }: Props) {
   const [period, setPeriod] = useState<Period>(() => periodFor('month', getToday()));
   const [data, setData] = useState<Parameters<typeof runPayroll>[0] | null>(null);
+  const [company, setCompany] = useState('');
+  const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [contracts, entries, leaves, adjustments, holidays, org] = await Promise.all([
-        getContracts(employee.id), getTimeEntries(employee.id), getLeaveRequests(employee.id), getPayAdjustments(), getHolidays(), getOrgSettings(),
+      const [contracts, entries, leaves, adjustments, holidays, org, companyName] = await Promise.all([
+        getContracts(employee.id), getTimeEntries(employee.id), getLeaveRequests(employee.id), getPayAdjustments(), getHolidays(), getOrgSettings(), getOrganizationName(),
       ]);
       if (!alive) return;
+      setCompany(companyName ?? '');
       setData({
         employees: [employee], contracts, entries, leaves, adjustments: adjustments.filter(a => a.employeeId === employee.id),
         holidays: holidays.map(h => h.date), timeZone: org?.timeZone ?? 'UTC', period,
@@ -76,7 +80,13 @@ export default function PayrollEstimate({ employee }: Props) {
           {res.warnings.map(w => (
             <p key={w} className="text-xs flex gap-1.5 text-amber-700"><AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />{w}</p>
           ))}
-          <p className="text-xs text-muted-foreground">Estimate before taxes and legal deductions, calculated from your contract.</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">Estimate calculated from your contract. It is not a legal payroll document.</p>
+            <Button size="sm" variant="outline" className="h-8 gap-1 shrink-0" onClick={() => setBlocked(!printHtml(buildPayslipHtml({ company, employee, period, result: res })))}>
+              <Printer className="h-3.5 w-3.5" /> Print payslip
+            </Button>
+          </div>
+          {blocked && <p className="text-xs text-destructive">Your browser blocked the print window. Allow pop-ups for this site and try again.</p>}
         </>
       )}
     </div>

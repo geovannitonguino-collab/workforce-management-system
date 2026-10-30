@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Employee } from '@/types/workforce';
 import { AdjustmentKind, ContractRecord, HourKind, Period } from '@/types/contract';
 import {
-  addPayAdjustment, deletePayAdjustment, getContracts, getHolidays, getLeaveRequests, getOrgSettings, getPayAdjustments, getTimeEntries,
+  addPayAdjustment, deletePayAdjustment, getContracts, getHolidays, getLeaveRequests, getOrganizationName, getOrgSettings, getPayAdjustments, getTimeEntries,
 } from '@/lib/store';
+import { buildPayslipHtml, printHtml } from '@/lib/printDocs';
 import { getToday } from '@/lib/calculations';
 import { runPayroll, formatMoney, PayAdjustmentRecord, PayrollRow } from '@/lib/payrollRun';
 import { PERIOD_KIND_LABEL, PeriodKind, periodFor, periodLabel, shiftPeriod } from '@/lib/periods';
@@ -13,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileText, Loader2, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Download, FileText, Loader2, Printer, Trash2 } from 'lucide-react';
 import { LeaveRequest, TimeEntry } from '@/types/workforce';
 import type { Holiday } from '@/lib/store';
 
@@ -34,7 +35,7 @@ interface Props {
 
 interface Data {
   contracts: ContractRecord[]; entries: TimeEntry[]; leaves: LeaveRequest[];
-  adjustments: PayAdjustmentRecord[]; holidays: Holiday[]; timeZone: string;
+  adjustments: PayAdjustmentRecord[]; holidays: Holiday[]; timeZone: string; company: string;
 }
 
 export default function PayrollPanel({ employees, currentEmployee, isDirector, onOpenContract, reloadKey = 0 }: Props) {
@@ -44,10 +45,10 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
   const [detail, setDetail] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [contracts, entries, leaves, adjustments, holidays, org] = await Promise.all([
-      getContracts(), getTimeEntries(), getLeaveRequests(), getPayAdjustments(), getHolidays(), getOrgSettings(),
+    const [contracts, entries, leaves, adjustments, holidays, org, company] = await Promise.all([
+      getContracts(), getTimeEntries(), getLeaveRequests(), getPayAdjustments(), getHolidays(), getOrgSettings(), getOrganizationName(),
     ]);
-    setData({ contracts, entries, leaves, adjustments, holidays, timeZone: org?.timeZone ?? 'UTC' });
+    setData({ contracts, entries, leaves, adjustments, holidays, timeZone: org?.timeZone ?? 'UTC', company: company ?? '' });
   }, []);
   useEffect(() => { load(); }, [load, reloadKey]);
 
@@ -177,7 +178,7 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
 
       {detailRow && data && (
         <PersonDialog
-          row={detailRow} period={period} adjustments={data.adjustments.filter(a => a.employeeId === detailRow.employee.id)}
+          row={detailRow} period={period} company={data.company} adjustments={data.adjustments.filter(a => a.employeeId === detailRow.employee.id)}
           canEdit={canEditAdjustments(detailRow.employee)} onClose={() => setDetail(null)}
           onOpenContract={() => { setDetail(null); onOpenContract(detailRow.employee); }} onChanged={load}
         />
@@ -186,8 +187,8 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
   );
 }
 
-function PersonDialog({ row, period, adjustments, canEdit, onClose, onOpenContract, onChanged }: {
-  row: PayrollRow; period: Period; adjustments: PayAdjustmentRecord[]; canEdit: boolean;
+function PersonDialog({ row, period, company, adjustments, canEdit, onClose, onOpenContract, onChanged }: {
+  row: PayrollRow; period: Period; company: string; adjustments: PayAdjustmentRecord[]; canEdit: boolean;
   onClose: () => void; onOpenContract: () => void; onChanged: () => void | Promise<void>;
 }) {
   const res = row.result!;
@@ -199,6 +200,7 @@ function PersonDialog({ row, period, adjustments, canEdit, onClose, onOpenContra
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(false);
   const inPeriod = adjustments.filter(a => a.date >= period.from && a.date <= period.to);
 
   const add = async () => {
@@ -296,8 +298,14 @@ function PersonDialog({ row, period, adjustments, canEdit, onClose, onOpenContra
             {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
 
-          <div className="flex justify-between">
-            <Button variant="outline" size="sm" onClick={onOpenContract}>View contract</Button>
+          {blocked && <p className="text-xs text-destructive">Your browser blocked the print window. Allow pop-ups for this site and try again.</p>}
+          <div className="flex flex-wrap justify-between gap-2">
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onOpenContract}>View contract</Button>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setBlocked(!printHtml(buildPayslipHtml({ company, employee: row.employee, period, result: res })))}>
+                <Printer className="h-3.5 w-3.5" /> Print payslip
+              </Button>
+            </div>
             <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
           </div>
         </div>

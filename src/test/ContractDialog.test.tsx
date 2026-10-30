@@ -24,6 +24,7 @@ const updateContract = vi.fn(async (id: string, form: Record<string, unknown>) =
 vi.mock('@/lib/store', () => ({
   getContracts: vi.fn(async () => [...stored]),
   getOrgSettings: vi.fn(async () => ({ timeZone: 'America/Bogota', defaultCurrency: 'COP' })),
+  getOrganizationName: vi.fn(async () => 'Acme SAS'),
   addContract: (...a: Parameters<typeof addContract>) => addContract(...a),
   updateContract: (...a: Parameters<typeof updateContract>) => updateContract(...a),
 }));
