@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Employee } from '@/types/workforce';
 import {
-  ContractFormValues, ContractRecord, PayPeriod, Surcharges, SUGGESTED_CONTRACT_TYPES, Weekday,
+  ContractFormValues, ContractRecord, DeductionLine, PayPeriod, Surcharges, SUGGESTED_CONTRACT_TYPES, Weekday,
 } from '@/types/contract';
 import { addContract, getContracts, getOrgSettings, updateContract } from '@/lib/store';
 import { blankContract } from '@/lib/contractDefaults';
@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, Plus, Trash2 } from 'lucide-react';
 
 const NEW = '__new__';
 const DAYS: { d: Weekday; label: string }[] = [
@@ -66,7 +66,59 @@ function validate(f: ContractFormValues): string | null {
   for (const d of DAYS) { const h = f.schedule[d.d]; if (!(h >= 0 && h <= 24)) return `Hours for ${d.label} must be between 0 and 24.`; }
   for (const s of SURCHARGE_LABELS) { const v = f.surcharges[s.key]; if (!(v >= 0 && v <= 1000)) return `"${s.label}" must be between 0 and 1000 %.`; }
   if (f.unpaidDayDivisor <= 0) return 'The unpaid-day divisor must be greater than zero.';
+  for (const l of f.deductionLines ?? []) {
+    if (!l.name.trim()) return 'Every deduction or contribution needs a name.';
+    if (!(l.value >= 0)) return `"${l.name}" cannot be negative.`;
+    if (l.mode === 'percent' && l.value > 100) return `"${l.name}" cannot be more than 100 %.`;
+  }
   return null;
+}
+
+const BLANK_LINE: DeductionLine = { name: '', kind: 'deduction', basis: 'gross', mode: 'percent', value: 0 };
+
+/** Rows of company-defined deductions and contributions. Trackly applies exactly what is typed here. */
+function DeductionEditor({ lines, onChange, disabled }: { lines: DeductionLine[]; onChange: (l: DeductionLine[]) => void; disabled?: boolean }) {
+  const update = (i: number, patch: Partial<DeductionLine>) => onChange(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Type any tax, social-security payment, loan repayment or other line your company applies. Trackly knows no legal rates: it only applies what you write.
+        "Withheld" lines are taken from the person's pay; "paid by the company" lines are an extra cost for the company.
+      </p>
+      {lines.length === 0 && <p className="text-xs text-muted-foreground">No lines: the person receives the whole amount.</p>}
+      {lines.map((l, i) => (
+        <div key={i} className="grid grid-cols-2 sm:grid-cols-12 gap-2 items-end rounded-lg border border-border/60 p-2">
+          <div className="col-span-2 sm:col-span-3"><Label className="text-xs">Name</Label><Input value={l.name} maxLength={60} disabled={disabled} placeholder="e.g. Health" onChange={e => update(i, { name: e.target.value })} /></div>
+          <div className="sm:col-span-3">
+            <Label className="text-xs">Who pays</Label>
+            <Select value={l.kind} disabled={disabled} onValueChange={v => update(i, { kind: v as DeductionLine['kind'] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="deduction">Withheld from the person</SelectItem><SelectItem value="employer">Paid by the company</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs">Applies to</Label>
+            <Select value={l.basis} disabled={disabled} onValueChange={v => update(i, { basis: v as DeductionLine['basis'] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="gross">All the pay</SelectItem><SelectItem value="base">Base pay only</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <div className="sm:col-span-2">
+            <Label className="text-xs">Type</Label>
+            <Select value={l.mode} disabled={disabled} onValueChange={v => update(i, { mode: v as DeductionLine['mode'] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="percent">Percent</SelectItem><SelectItem value="fixed">Fixed per month</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <div className="sm:col-span-1"><Label className="text-xs">{l.mode === 'percent' ? '%' : 'Amount'}</Label><NumField value={l.value} max={l.mode === 'percent' ? 100 : undefined} disabled={disabled} onChange={v => update(i, { value: v ?? 0 })} /></div>
+          {!disabled && <Button type="button" size="sm" variant="ghost" className="sm:col-span-1 h-9 w-9 p-0 text-destructive" aria-label="Remove line" onClick={() => onChange(lines.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>}
+        </div>
+      ))}
+      {!disabled && lines.length < 20 && (
+        <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => onChange([...lines, { ...BLANK_LINE }])}><Plus className="h-3.5 w-3.5" /> Add a line</Button>
+      )}
+    </div>
+  );
 }
 
 interface Props {
@@ -83,6 +135,7 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
   const [form, setForm] = useState<ContractFormValues | null>(null);
   const [defaultCurrency, setDefaultCurrency] = useState('USD');
   const [advanced, setAdvanced] = useState(false);
+  const [dedOpen, setDedOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -95,6 +148,7 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
     setForm(base);
     setSelected(NEW);
     setAdvanced(base.overtimeEligible || Object.values(base.surcharges).some(v => v > 0));
+    setDedOpen((base.deductionLines?.length ?? 0) > 0);
     setFormKey(k => k + 1);
     setError(null); setSaved(false);
   }, [defaultCurrency]);
@@ -114,6 +168,7 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
         setSelected(current.id);
         setForm(toForm(current));
         setAdvanced(current.overtimeEligible || Object.values(current.surcharges).some(v => v > 0));
+        setDedOpen(current.deductionLines.length > 0);
         setFormKey(k => k + 1);
       } else {
         startNew(undefined, cur);
@@ -130,6 +185,7 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
     if (!v) return;
     setSelected(id); setForm(toForm(v));
     setAdvanced(v.overtimeEligible || Object.values(v.surcharges).some(x => x > 0));
+    setDedOpen((v.deductionLines?.length ?? 0) > 0);
     setFormKey(k => k + 1); setError(null); setSaved(false);
   };
 
@@ -368,6 +424,18 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
                       <NumField value={form.unpaidDayDivisor} min={1} disabled={!canEdit} onChange={v => set('unpaidDayDivisor', v ?? 30)} />
                     </div>
                   </div>
+                </div>
+              )}
+            </section>
+
+            <section className="space-y-3">
+              <button type="button" className="flex items-center gap-1 text-sm font-semibold" onClick={() => setDedOpen(o => !o)}>
+                {dedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                Deductions and contributions (optional)
+              </button>
+              {dedOpen && (
+                <div className="rounded-lg border border-border/60 p-4">
+                  <DeductionEditor lines={form.deductionLines ?? []} disabled={!canEdit} onChange={l => set('deductionLines', l)} />
                 </div>
               )}
             </section>

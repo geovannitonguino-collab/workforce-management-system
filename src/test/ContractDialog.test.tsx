@@ -124,6 +124,42 @@ describe('ContractDialog', () => {
     expect(updateContract).not.toHaveBeenCalled();
   });
 
+  it('shows the deduction lines of a contract and saves a new line the company typed', async () => {
+    stored.push(existing({ deductionLines: [{ name: 'Income tax', kind: 'deduction', basis: 'gross', mode: 'percent', value: 10 }] }));
+    await mount(<ContractDialog employee={emp} canEdit onClose={() => {}} />);
+    await waitFor(() => hasText('Add a line'));
+    expect(inputByValue('Income tax')).toBeDefined(); // section opens by itself when the contract has lines
+    await click('Add a line');
+    const names = document.body.querySelectorAll<HTMLInputElement>('input[placeholder="e.g. Health"]');
+    const name = names[names.length - 1]; // the new, empty row
+    await type(name, 'Health');
+    const row = name.closest('.grid') as HTMLElement;
+    await type(row.querySelector<HTMLInputElement>('input[type="number"]')!, '4');
+    await click('Save changes');
+    await waitFor(() => expect(updateContract).toHaveBeenCalledTimes(1));
+    const form = updateContract.mock.calls[0][1] as unknown as { deductionLines: { name: string; kind: string; mode: string; basis: string; value: number }[] };
+    expect(form.deductionLines).toEqual([
+      { name: 'Income tax', kind: 'deduction', basis: 'gross', mode: 'percent', value: 10 },
+      { name: 'Health', kind: 'deduction', basis: 'gross', mode: 'percent', value: 4 },
+    ]);
+  });
+
+  it('refuses a deduction line with no name or a percentage above 100', async () => {
+    stored.push(existing());
+    await mount(<ContractDialog employee={emp} canEdit onClose={() => {}} />);
+    await waitFor(() => hasText('Deductions and contributions (optional)'));
+    await click('Deductions and contributions (optional)');
+    await click('Add a line');
+    await click('Save changes');
+    await waitFor(() => hasText('needs a name'));
+    const name = document.body.querySelector<HTMLInputElement>('input[placeholder="e.g. Health"]')!;
+    await type(name, 'Too much');
+    await type((name.closest('.grid') as HTMLElement).querySelector<HTMLInputElement>('input[type="number"]')!, '150');
+    await click('Save changes');
+    await waitFor(() => hasText('more than 100'));
+    expect(updateContract).not.toHaveBeenCalled();
+  });
+
   it('is read-only when the viewer cannot edit', async () => {
     stored.push(existing());
     await mount(<ContractDialog employee={emp} canEdit={false} onClose={() => {}} />);

@@ -64,11 +64,12 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
 
   const exportCSV = () => {
     if (!run) return;
-    const head = ['Employee', 'Currency', 'Hours', 'Base', 'Surcharges', 'Overtime', 'Paid leave', 'Unpaid deduction', 'Commissions', 'Deductions', 'Total', 'Warnings'];
+    const head = ['Employee', 'Currency', 'Hours', 'Base', 'Surcharges', 'Overtime', 'Paid leave', 'Unpaid deduction', 'Commissions', 'Refunds', 'Deductions', 'Total', 'Withheld', 'Net', 'Company contributions', 'Company cost', 'Warnings'];
     const lines = run.rows.map(r => r.result
       ? [r.employee.name, r.result.currency, r.result.totalHours, r.result.pay.base, r.result.pay.surcharges, r.result.pay.overtime, r.result.pay.paidLeave,
-        r.result.pay.unpaidDeduction, r.result.pay.commissions, r.result.pay.deductions, r.result.gross, r.result.warnings.join(' | ')]
-      : [r.employee.name, '', '', '', '', '', '', '', '', '', '', 'No contract']);
+        r.result.pay.unpaidDeduction, r.result.pay.commissions, r.result.pay.reimbursements, r.result.pay.deductions, r.result.gross,
+        r.result.withheld, r.result.net, r.result.employerContributions, r.result.employerCost, r.result.warnings.join(' | ')]
+      : [r.employee.name, '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'No contract']);
     const csv = [head, ...lines].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const a = Object.assign(document.createElement('a'), {
       href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: `payroll-${period.from}_${period.to}.csv`,
@@ -116,6 +117,9 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Total {t.currency}</p>
                   <p className="text-xl font-bold text-primary">{formatMoney(t.gross, t.currency)}</p>
                   <p className="text-xs text-muted-foreground">{t.people} {t.people === 1 ? 'person' : 'people'} · {t.hours} h</p>
+                  {(t.net !== t.gross || t.employerCost !== t.gross) && (
+                    <p className="text-xs text-muted-foreground">Net to people {formatMoney(t.net, t.currency)} · company cost {formatMoney(t.employerCost, t.currency)}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -137,7 +141,7 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  {['Person', 'Hours', 'Base', 'Extras', 'Time off', 'Commissions', 'Total'].map(h => (
+                  {['Person', 'Hours', 'Base', 'Extras', 'Time off', 'Commissions', 'Total', 'Net'].map(h => (
                     <TableHead key={h} className={`font-semibold text-xs ${h === 'Person' ? '' : 'text-right'}`}>{h}</TableHead>
                   ))}
                 </TableRow>
@@ -156,8 +160,9 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
                       <TableCell className="text-right font-mono text-sm">{m(res.pay.base)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{m(res.pay.surcharges + res.pay.overtime)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{m(res.pay.paidLeave - res.pay.unpaidDeduction)}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{m(res.pay.commissions - res.pay.deductions)}</TableCell>
-                      <TableCell className="text-right font-bold text-primary">{m(res.gross)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{m(res.pay.commissions + res.pay.reimbursements - res.pay.deductions)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{m(res.gross)}</TableCell>
+                      <TableCell className="text-right font-bold text-primary">{m(res.net)}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -215,7 +220,8 @@ function PersonDialog({ row, period, adjustments, canEdit, onClose, onOpenContra
     ['Overtime', res.pay.overtime],
     ['Paid time off (hourly pay)', res.pay.paidLeave],
     ['Unpaid time off', -res.pay.unpaidDeduction],
-    ['Commissions, bonuses and refunds', res.pay.commissions],
+    ['Commissions and bonuses', res.pay.commissions],
+    ['Expense refunds', res.pay.reimbursements],
     ['Deductions', -res.pay.deductions],
   ];
 
@@ -228,8 +234,20 @@ function PersonDialog({ row, period, adjustments, canEdit, onClose, onOpenContra
             {lines.filter(l => l[1] !== 0 || l[0] === 'Base pay').map(([label, v]) => (
               <div key={label} className="flex justify-between px-4 py-2 text-sm"><span>{label}</span><span className="font-mono">{m(v)}</span></div>
             ))}
-            <div className="flex justify-between px-4 py-3 bg-primary/5"><span className="font-semibold">Total</span><span className="text-lg font-bold text-primary">{m(res.gross)}</span></div>
+            <div className="flex justify-between px-4 py-3 bg-muted/40"><span className="font-semibold">Total before deductions</span><span className="font-mono font-semibold">{m(res.gross)}</span></div>
+            {res.deductionLines.filter(l => l.kind === 'deduction').map(l => (
+              <div key={l.name} className="flex justify-between px-4 py-2 text-sm"><span>{l.name} (withheld)</span><span className="font-mono text-destructive">−{m(l.amount)}</span></div>
+            ))}
+            <div className="flex justify-between px-4 py-3 bg-primary/5"><span className="font-semibold">Net pay</span><span className="text-lg font-bold text-primary">{m(res.net)}</span></div>
           </div>
+          {res.deductionLines.some(l => l.kind === 'employer') && (
+            <div className="rounded-xl border border-border/60 divide-y divide-border/60 text-sm">
+              {res.deductionLines.filter(l => l.kind === 'employer').map(l => (
+                <div key={l.name} className="flex justify-between px-4 py-2"><span>{l.name} (paid by the company)</span><span className="font-mono">{m(l.amount)}</span></div>
+              ))}
+              <div className="flex justify-between px-4 py-2 font-semibold"><span>Total cost for the company</span><span className="font-mono">{m(res.employerCost)}</span></div>
+            </div>
+          )}
 
           <div>
             <p className="text-sm font-semibold mb-1">Hours worked: {res.totalHours}</p>

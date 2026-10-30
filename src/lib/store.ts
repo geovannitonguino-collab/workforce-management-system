@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { AdjustmentKind, ContractFormValues, ContractRecord, OrgSettings, Weekday, Surcharges } from '@/types/contract';
+import type { AdjustmentKind, DeductionLine, ContractFormValues, ContractRecord, OrgSettings, Weekday, Surcharges } from '@/types/contract';
 import type { PayAdjustmentRecord } from '@/lib/payrollRun';
 import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, BillingStatus, Department, CorrectionKind, ClockAction } from '@/types/workforce';
 
@@ -286,6 +286,14 @@ export async function getDirectory(): Promise<{ id: string; name: string; depart
 const WEEKDAYS: Weekday[] = [0, 1, 2, 3, 4, 5, 6];
 const SURCHARGE_KEYS: (keyof Surcharges)[] = ['night', 'holiday', 'holidayNight', 'otDay', 'otNight', 'otHolidayDay', 'otHolidayNight'];
 
+function toDeductionLines(raw: unknown): DeductionLine[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(x => x as Partial<DeductionLine>).filter(x => x && typeof x.name === 'string').map(x => ({
+    name: String(x.name), kind: x.kind === 'employer' ? 'employer' : 'deduction', basis: x.basis === 'base' ? 'base' : 'gross',
+    mode: x.mode === 'fixed' ? 'fixed' : 'percent', value: Number(x.value) || 0,
+  }));
+}
+
 function toContract(r: Record<string, unknown>): ContractRecord {
   const sched = (r.schedule ?? {}) as Record<string, number>;
   const sur = (r.surcharges ?? {}) as Record<string, number>;
@@ -304,6 +312,7 @@ function toContract(r: Record<string, unknown>): ContractRecord {
     nightStart: r.night_start as string, nightEnd: r.night_end as string,
     holidayWeekdays: ((r.holiday_weekdays as number[] | null) ?? []) as Weekday[],
     surcharges: Object.fromEntries(SURCHARGE_KEYS.map(k => [k, Number(sur[k] ?? 0)])) as unknown as Surcharges,
+    deductionLines: toDeductionLines(r.deduction_lines),
     monthlyHoursDivisor: r.monthly_hours_divisor == null ? undefined : Number(r.monthly_hours_divisor),
     unpaidDayDivisor: Number(r.unpaid_day_divisor),
     vacationDaysPerMonth: Number(r.vacation_days_per_month), ptoHoursPerYear: Number(r.pto_hours_per_year),
@@ -326,6 +335,8 @@ function contractRow(c: ContractFormValues): Record<string, unknown> {
     monthly_hours_divisor: c.monthlyHoursDivisor ?? null, unpaid_day_divisor: c.unpaidDayDivisor,
     vacation_days_per_month: c.vacationDaysPerMonth, pto_hours_per_year: c.ptoHoursPerYear,
     note: c.note?.trim() || null,
+    // only sent when used, so saving contracts keeps working before the database has the column
+    ...((c.deductionLines?.length ?? 0) > 0 ? { deduction_lines: c.deductionLines!.map(l => ({ ...l, name: l.name.trim() })) } : {}),
   };
 }
 

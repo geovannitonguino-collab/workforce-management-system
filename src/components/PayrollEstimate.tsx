@@ -60,9 +60,18 @@ export default function PayrollEstimate({ employee }: Props) {
             {res.pay.overtime > 0 && <div className="flex justify-between px-4 py-2"><span>Overtime ({res.overtimeHours} h)</span><span className="font-mono">{m(res.pay.overtime)}</span></div>}
             {res.pay.paidLeave > 0 && <div className="flex justify-between px-4 py-2"><span>Paid time off</span><span className="font-mono">{m(res.pay.paidLeave)}</span></div>}
             {res.pay.unpaidDeduction > 0 && <div className="flex justify-between px-4 py-2"><span>Unpaid time off</span><span className="font-mono text-destructive">−{m(res.pay.unpaidDeduction)}</span></div>}
-            {res.pay.commissions > 0 && <div className="flex justify-between px-4 py-2"><span>Commissions, bonuses and refunds</span><span className="font-mono">{m(res.pay.commissions)}</span></div>}
+            {res.pay.commissions > 0 && <div className="flex justify-between px-4 py-2"><span>Commissions and bonuses</span><span className="font-mono">{m(res.pay.commissions)}</span></div>}
+            {res.pay.reimbursements > 0 && <div className="flex justify-between px-4 py-2"><span>Expense refunds</span><span className="font-mono">{m(res.pay.reimbursements)}</span></div>}
             {res.pay.deductions > 0 && <div className="flex justify-between px-4 py-2"><span>Deductions</span><span className="font-mono text-destructive">−{m(res.pay.deductions)}</span></div>}
-            <div className="flex justify-between px-4 py-3 bg-primary/5"><span className="font-semibold">Estimated total</span><span className="text-2xl font-bold text-primary">{m(res.gross)}</span></div>
+            {res.withheld > 0 && (
+              <>
+                <div className="flex justify-between px-4 py-2 bg-muted/40"><span className="font-semibold">Total before deductions</span><span className="font-mono">{m(res.gross)}</span></div>
+                {res.deductionLines.filter(l => l.kind === 'deduction' && l.amount > 0).map(l => (
+                  <div key={l.name} className="flex justify-between px-4 py-2"><span>{l.name}</span><span className="font-mono text-destructive">−{m(l.amount)}</span></div>
+                ))}
+              </>
+            )}
+            <div className="flex justify-between px-4 py-3 bg-primary/5"><span className="font-semibold">{res.withheld > 0 ? 'Estimated net pay' : 'Estimated total'}</span><span className="text-2xl font-bold text-primary">{m(res.net)}</span></div>
           </div>
           {res.warnings.map(w => (
             <p key={w} className="text-xs flex gap-1.5 text-amber-700"><AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />{w}</p>

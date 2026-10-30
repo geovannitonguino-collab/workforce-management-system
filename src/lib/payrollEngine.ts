@@ -114,7 +114,7 @@ export function calculatePay(input: PayrollInput): PayrollResult {
   };
 
   const hours = Object.fromEntries(KINDS.map(k => [k, 0])) as Record<HourKind, number>;
-  const pay = { base: 0, surcharges: 0, overtime: 0, paidLeave: 0, unpaidDeduction: 0, commissions: 0, deductions: 0 };
+  const pay = { base: 0, surcharges: 0, overtime: 0, paidLeave: 0, unpaidDeduction: 0, commissions: 0, reimbursements: 0, deductions: 0 };
   const dayMin = new Map<string, number>();
   const weekMin = new Map<string, number>();
   const dayHoursByDate = new Map<string, number>();
@@ -205,17 +205,43 @@ export function calculatePay(input: PayrollInput): PayrollResult {
   // 4) hand-entered lines
   for (const a of input.adjustments) {
     if (a.date < period.from || a.date > period.to) continue;
-    if (a.kind === 'deduction') pay.deductions += a.amount; else pay.commissions += a.amount;
+    if (a.kind === 'deduction') pay.deductions += a.amount;
+    else if (a.kind === 'reimbursement') pay.reimbursements += a.amount;
+    else pay.commissions += a.amount;
   }
 
   const rounded = Object.fromEntries(Object.entries(pay).map(([k, v]) => [k, r4(v)])) as typeof pay;
   const hoursR = Object.fromEntries(KINDS.map(k => [k, r4(hours[k])])) as Record<HourKind, number>;
   const lastVersion = termsFor(period.to) ?? versions[versions.length - 1];
-  const gross = r4(rounded.base + rounded.surcharges + rounded.overtime + rounded.paidLeave - rounded.unpaidDeduction + rounded.commissions - rounded.deductions);
+  const gross = r4(rounded.base + rounded.surcharges + rounded.overtime + rounded.paidLeave - rounded.unpaidDeduction
+    + rounded.commissions + rounded.reimbursements - rounded.deductions);
+
+  // 5) company-defined deductions and contributions (taxes, social security...), from the version in force at the end
+  const lines = lastVersion?.deductionLines ?? [];
+  const taxableGross = Math.max(0, gross - rounded.reimbursements);
+  const baseAfterUnpaid = Math.max(0, rounded.base - rounded.unpaidDeduction);
+  let activeMonths = 0; // days covered by a contract, each as a fraction of its month
+  for (let d = period.from; d <= period.to; d = addDays(d, 1)) {
+    const v = termsFor(d);
+    if (v && !(v.endDate && d > v.endDate)) activeMonths += 1 / daysInMonth(d);
+  }
+  const deductionLines = lines.map(l => {
+    const raw = l.mode === 'percent' ? (l.basis === 'base' ? baseAfterUnpaid : taxableGross) * (l.value / 100) : l.value * activeMonths;
+    return { name: l.name, kind: l.kind, amount: r4(Math.max(0, raw)) };
+  });
+  const withheld = r4(deductionLines.filter(l => l.kind === 'deduction').reduce((s, l) => s + l.amount, 0));
+  const employerContributions = r4(deductionLines.filter(l => l.kind === 'employer').reduce((s, l) => s + l.amount, 0));
+  const overlapping = versions.filter(v => v.effectiveFrom <= period.to && !(v.endDate && v.endDate < period.from));
+  if (new Set(overlapping.map(v => JSON.stringify(v.deductionLines ?? []))).size > 1) {
+    warn('The period spans contract versions with different deductions; the one in force at the end of the period was applied to all of it.');
+  }
+
   return {
     period, currency: lastVersion?.currency ?? '', hours: hoursR,
     totalHours: r4(KINDS.reduce((s, k) => s + hours[k], 0)),
     overtimeHours: r4(hours.otDay + hours.otNight + hours.otHolidayDay + hours.otHolidayNight),
-    pay: rounded, gross, warnings: versions.length === 0 ? ['This person has no contract yet.'] : warnings,
+    pay: rounded, gross, deductionLines, withheld, net: r4(gross - withheld), employerContributions,
+    employerCost: r4(gross + employerContributions),
+    warnings: versions.length === 0 ? ['This person has no contract yet.'] : warnings,
   };
 }

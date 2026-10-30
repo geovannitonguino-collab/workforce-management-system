@@ -6,7 +6,7 @@ export interface PayAdjustmentRecord extends PayAdjustment { id: string; employe
 
 export interface PayrollRow { employee: Employee; contracts: ContractRecord[]; result: PayrollResult | null }
 
-export interface CurrencyTotal { currency: string; gross: number; hours: number; people: number }
+export interface CurrencyTotal { currency: string; gross: number; net: number; employerCost: number; hours: number; people: number }
 
 export interface PayrollRun { rows: PayrollRow[]; totals: CurrencyTotal[]; withoutContract: Employee[] }
 
@@ -42,13 +42,16 @@ export function runPayroll(args: {
   for (const r of rows) {
     if (!r.result) continue;
     const cur = r.result.currency || '—';
-    const t = byCurrency.get(cur) ?? { currency: cur, gross: 0, hours: 0, people: 0 };
-    t.gross += r.result.gross; t.hours += r.result.totalHours; t.people += 1;
+    const t = byCurrency.get(cur) ?? { currency: cur, gross: 0, net: 0, employerCost: 0, hours: 0, people: 0 };
+    t.gross += r.result.gross; t.net += r.result.net; t.employerCost += r.result.employerCost; t.hours += r.result.totalHours; t.people += 1;
     byCurrency.set(cur, t);
   }
   return {
     rows,
-    totals: [...byCurrency.values()].map(t => ({ ...t, gross: Math.round(t.gross * 10000) / 10000, hours: Math.round(t.hours * 10000) / 10000 })),
+    totals: [...byCurrency.values()].map(t => ({
+      ...t, gross: Math.round(t.gross * 10000) / 10000, net: Math.round(t.net * 10000) / 10000,
+      employerCost: Math.round(t.employerCost * 10000) / 10000, hours: Math.round(t.hours * 10000) / 10000,
+    })),
     withoutContract: rows.filter(r => !r.result).map(r => r.employee),
   };
 }

@@ -37,6 +37,21 @@ export interface Surcharges {
 
 export type OvertimeBasis = 'schedule' | 'fixed' | 'none';
 
+/**
+ * A deduction or contribution the COMPANY defines (income tax withholding, health, pension, a loan repayment...).
+ * Trackly ships no legal tables: whoever fills in the contract types the name and the percentage or amount.
+ */
+export interface DeductionLine {
+  name: string;
+  /** 'deduction' is withheld from the person's pay; 'employer' is an extra cost the company pays on top of it */
+  kind: 'deduction' | 'employer';
+  /** 'gross' = everything taxable (without expense refunds); 'base' = base pay only, after unpaid days */
+  basis: 'gross' | 'base';
+  /** 'percent' of the basis, or a 'fixed' amount per month (prorated by days when the period is shorter) */
+  mode: 'percent' | 'fixed';
+  value: number;
+}
+
 export interface ContractTerms {
   effectiveFrom: string;            // YYYY-MM-DD, first day this version applies
   endDate?: string;                 // fixed-term / project contracts
@@ -57,6 +72,7 @@ export interface ContractTerms {
   nightEnd: string;                 // 'HH:MM'
   holidayWeekdays: Weekday[];       // weekdays paid with the holiday rates (usually [0])
   surcharges: Surcharges;
+  deductionLines?: DeductionLine[];
   monthlyHoursDivisor?: number;     // hours per month used to value one hour of a fixed pay; default weekly*52/12
   unpaidDayDivisor: number;         // monthly pay / divisor = value of one unpaid day (usually 30)
   vacationDaysPerMonth: number;     // accrual
@@ -90,10 +106,17 @@ export interface PayrollResult {
     overtime: number;    // overtime hours, including their surcharge
     paidLeave: number;   // paid leave for hourly contracts (fixed pay already includes it in base)
     unpaidDeduction: number; // deduction from fixed pay for unpaid leave
-    commissions: number; // commissions + bonuses + refunds entered by hand
+    commissions: number; // commissions + bonuses entered by hand
+    reimbursements: number; // expense refunds: paid, but never taxable
     deductions: number;  // manual deductions
   };
   gross: number;
+  /** the lines defined in the contract, with what each one comes to in this period */
+  deductionLines: { name: string; kind: 'deduction' | 'employer'; amount: number }[];
+  withheld: number;              // sum of the 'deduction' lines
+  net: number;                   // gross - withheld: what the person receives
+  employerContributions: number; // sum of the 'employer' lines
+  employerCost: number;          // gross + employer contributions: what the company really spends
   warnings: string[];
 }
 
