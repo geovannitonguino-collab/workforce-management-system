@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { addHoliday, deleteHoliday, getHolidays, getOrgSettings, setOrgSettings } from '@/lib/store';
 import type { Holiday } from '@/lib/store';
 import { formatDate } from '@/lib/calculations';
+import { AMERICAS, AMERICAS_CURRENCIES, findCountry } from '@/lib/countries';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,7 +60,7 @@ export default function CompanyCalendar() {
         <h3 className="text-base font-semibold">Company calendar and settings</h3>
       </div>
       <p className="text-xs text-muted-foreground">
-        The time zone decides what counts as night and which day an hour belongs to. Holiday dates are the days paid with the holiday percentages in each person's contract.
+        Choosing a country fills in its currency and time zone; you can change either, for example if you pay everyone in US dollars. The time zone decides what counts as night and which day an hour belongs to. Holiday dates are the days paid with the holiday percentages in each person's contract.
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -68,8 +69,21 @@ export default function CompanyCalendar() {
           <Input list="tz-list" value={tz} onChange={e => setTz(e.target.value)} />
           <datalist id="tz-list">{COMMON_ZONES.map(z => <option key={z} value={z} />)}</datalist>
         </div>
-        <div><Label>Country (optional)</Label><Input value={country} onChange={e => setCountry(e.target.value)} maxLength={60} /></div>
-        <div><Label>Default currency (optional)</Label><Input value={currency} maxLength={3} placeholder="USD" onChange={e => setCurrency(e.target.value.toUpperCase())} /></div>
+        <div>
+          <Label>Country</Label>
+          <Input list="country-list" value={country} maxLength={60} placeholder="Pick or type a country"
+            onChange={e => {
+              setCountry(e.target.value);
+              const c = findCountry(e.target.value);
+              if (c) { setCurrency(c.currency); setTz(c.timeZone); } // pre-fill, still editable
+            }} />
+          <datalist id="country-list">{AMERICAS.map(c => <option key={c.name} value={c.name} />)}</datalist>
+        </div>
+        <div>
+          <Label>Default currency</Label>
+          <Input list="currency-list" value={currency} maxLength={3} placeholder="USD" onChange={e => setCurrency(e.target.value.toUpperCase())} />
+          <datalist id="currency-list">{AMERICAS_CURRENCIES.map(c => <option key={c} value={c} />)}</datalist>
+        </div>
       </div>
       <Button size="sm" onClick={saveSettings} disabled={busy}>{busy && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />} Save settings</Button>
 
