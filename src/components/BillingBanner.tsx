@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { BillingStatus } from '@/types/workforce';
 import { getBillingStatus } from '@/lib/store';
 import { formatDate } from '@/lib/calculations';
-import { CONTACT_EMAIL } from '@/lib/legal';
+import PlansDialog from '@/components/PlansDialog';
 import { CreditCard } from 'lucide-react';
 
 function daysLeft(iso?: string): number {
@@ -13,6 +13,7 @@ function daysLeft(iso?: string): number {
 /** Admin-only plan/usage strip. Payments are not wired yet, so it only informs. */
 export default function BillingBanner() {
   const [b, setB] = useState<BillingStatus | null>(null);
+  const [plansOpen, setPlansOpen] = useState(false);
   useEffect(() => { getBillingStatus().then(setB); }, []);
   if (!b) return null;
 
@@ -34,7 +35,8 @@ export default function BillingBanner() {
         <p className="text-sm font-semibold">{b.planName} · {usage}</p>
         <p className="text-xs text-muted-foreground">{message}</p>
       </div>
-      <a className="text-xs text-primary underline shrink-0" href={`mailto:${CONTACT_EMAIL}?subject=Trackly%20plan`}>Change plan</a>
+      <button type="button" className="text-xs text-primary underline shrink-0" onClick={() => setPlansOpen(true)}>Change plan</button>
+      <PlansDialog open={plansOpen} currentPlanId={b.planId} onClose={() => setPlansOpen(false)} />
     </div>
   );
 }

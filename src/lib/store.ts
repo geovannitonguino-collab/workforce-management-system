@@ -251,25 +251,6 @@ export async function getBillingStatus(): Promise<BillingStatus | null> {
   };
 }
 
-export async function getMyIp(): Promise<string | null> {
-  const { data, error } = await supabase.rpc('my_ip');
-  return error ? null : (data as string | null);
-}
-/** true when the organization has no network restriction or this connection is allowed. Fails open on error (the database still enforces). */
-export async function canClockHere(): Promise<boolean> {
-  const { data, error } = await supabase.rpc('can_clock_here');
-  return error ? true : data === true;
-}
-export async function getClockPolicy(): Promise<{ enabled: boolean; ips: string[] } | null> {
-  const { data, error } = await supabase.rpc('get_clock_policy');
-  if (error || !data || data.length === 0) return null;
-  return { enabled: data[0].enabled as boolean, ips: (data[0].ips as string[]) ?? [] };
-}
-export async function setClockPolicy(enabled: boolean, ips: string[]): Promise<void> {
-  const { error } = await supabase.rpc('set_clock_policy', { p_enabled: enabled, p_ips: ips });
-  if (error) throw error;
-}
-
 function toDepartment(r: Record<string, unknown>): Department {
   return { id: r.id as string, name: r.name as string, managerEmployeeId: (r.manager_employee_id as string | null) ?? undefined };
 }
@@ -415,4 +396,21 @@ export async function deleteHoliday(id: string): Promise<void> {
 export async function setOrgSettings(timeZone: string, country: string, currency: string): Promise<void> {
   const { error } = await supabase.rpc('set_org_settings', { p_time_zone: timeZone, p_country: country, p_currency: currency || null });
   if (error) throw error;
+}
+
+// ---------------------------------------------------------------- plans
+export interface PlanInfo {
+  id: string; name: string; description?: string; maxEmployees?: number; trialDays: number;
+  priceUsd?: number; priceCop?: number; sortOrder: number;
+}
+/** Plans offered by the provider. Prices are optional: a plan without price shows "Contact us". */
+export async function getPlans(): Promise<PlanInfo[]> {
+  const { data, error } = await supabase.from('plans').select('*');
+  if (error) return [];
+  return (data ?? []).map(r => ({
+    id: r.id as string, name: r.name as string, description: (r.description as string | null) ?? undefined,
+    maxEmployees: (r.max_employees as number | null) ?? undefined, trialDays: Number(r.trial_days ?? 0),
+    priceUsd: r.price_usd == null ? undefined : Number(r.price_usd), priceCop: r.price_cop == null ? undefined : Number(r.price_cop),
+    sortOrder: Number(r.sort_order ?? 0),
+  })).sort((a, b) => a.sortOrder - b.sortOrder);
 }
