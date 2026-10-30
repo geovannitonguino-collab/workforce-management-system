@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { ContractFormValues, ContractRecord, OrgSettings, Weekday, Surcharges } from '@/types/contract';
 import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, BillingStatus, Department, CorrectionKind, ClockAction } from '@/types/workforce';
 
 function toEmployee(r: Record<string, unknown>): Employee {
@@ -297,4 +298,77 @@ export async function getDirectory(): Promise<{ id: string; name: string; depart
   const { data, error } = await supabase.from('employee_directory').select('*').order('name');
   if (error) return [];
   return (data ?? []).map(r => ({ id: r.id as string, name: r.name as string, departmentId: (r.department_id as string | null) ?? undefined, role: r.role as Employee['role'] }));
+}
+
+// ---------------------------------------------------------------- contracts
+const WEEKDAYS: Weekday[] = [0, 1, 2, 3, 4, 5, 6];
+const SURCHARGE_KEYS: (keyof Surcharges)[] = ['night', 'holiday', 'holidayNight', 'otDay', 'otNight', 'otHolidayDay', 'otHolidayNight'];
+
+function toContract(r: Record<string, unknown>): ContractRecord {
+  const sched = (r.schedule ?? {}) as Record<string, number>;
+  const sur = (r.surcharges ?? {}) as Record<string, number>;
+  return {
+    id: r.id as string, employeeId: r.employee_id as string,
+    effectiveFrom: r.effective_from as string, endDate: (r.end_date as string | null) ?? undefined,
+    relationship: r.relationship as ContractRecord['relationship'], contractType: (r.contract_type as string) ?? '',
+    payType: r.pay_type as ContractRecord['payType'], payPeriod: r.pay_period as ContractRecord['payPeriod'],
+    amount: Number(r.amount), currency: r.currency as string,
+    schedule: Object.fromEntries(WEEKDAYS.map(d => [d, Number(sched[String(d)] ?? 0)])) as Record<Weekday, number>,
+    maxDailyHours: r.max_daily_hours == null ? undefined : Number(r.max_daily_hours),
+    tracksTime: r.tracks_time as boolean,
+    overtimeEligible: r.overtime_eligible as boolean, overtimeBasis: r.overtime_basis as ContractRecord['overtimeBasis'],
+    overtimeDailyHours: r.overtime_daily_hours == null ? undefined : Number(r.overtime_daily_hours),
+    overtimeWeeklyHours: r.overtime_weekly_hours == null ? undefined : Number(r.overtime_weekly_hours),
+    nightStart: r.night_start as string, nightEnd: r.night_end as string,
+    holidayWeekdays: ((r.holiday_weekdays as number[] | null) ?? []) as Weekday[],
+    surcharges: Object.fromEntries(SURCHARGE_KEYS.map(k => [k, Number(sur[k] ?? 0)])) as unknown as Surcharges,
+    monthlyHoursDivisor: r.monthly_hours_divisor == null ? undefined : Number(r.monthly_hours_divisor),
+    unpaidDayDivisor: Number(r.unpaid_day_divisor),
+    vacationDaysPerMonth: Number(r.vacation_days_per_month), ptoHoursPerYear: Number(r.pto_hours_per_year),
+    note: (r.note as string | null) ?? undefined, createdBy: (r.created_by as string | null) ?? undefined,
+    createdAt: r.created_at as string,
+  };
+}
+
+function contractRow(c: ContractFormValues): Record<string, unknown> {
+  return {
+    effective_from: c.effectiveFrom, end_date: c.endDate || null,
+    relationship: c.relationship, contract_type: c.contractType.trim(),
+    pay_type: c.payType, pay_period: c.payPeriod, amount: c.amount, currency: c.currency.trim().toUpperCase(),
+    schedule: Object.fromEntries(WEEKDAYS.map(d => [String(d), c.schedule[d]])),
+    max_daily_hours: c.maxDailyHours ?? null, tracks_time: c.tracksTime,
+    overtime_eligible: c.overtimeEligible, overtime_basis: c.overtimeBasis,
+    overtime_daily_hours: c.overtimeDailyHours ?? null, overtime_weekly_hours: c.overtimeWeeklyHours ?? null,
+    night_start: c.nightStart, night_end: c.nightEnd, holiday_weekdays: c.holidayWeekdays,
+    surcharges: Object.fromEntries(SURCHARGE_KEYS.map(k => [k, c.surcharges[k] ?? 0])),
+    monthly_hours_divisor: c.monthlyHoursDivisor ?? null, unpaid_day_divisor: c.unpaidDayDivisor,
+    vacation_days_per_month: c.vacationDaysPerMonth, pto_hours_per_year: c.ptoHoursPerYear,
+    note: c.note?.trim() || null,
+  };
+}
+
+/** Contract versions the current user may see (own, or the people they manage). Newest first. */
+export async function getContracts(employeeId?: string): Promise<ContractRecord[]> {
+  let q = supabase.from('employee_contracts').select('*').order('effective_from', { ascending: false });
+  if (employeeId) q = q.eq('employee_id', employeeId);
+  const { data, error } = await q;
+  if (error) return [];
+  return (data ?? []).map(toContract);
+}
+export async function addContract(employeeId: string, c: ContractFormValues): Promise<ContractRecord> {
+  const { data, error } = await supabase.from('employee_contracts').insert({ employee_id: employeeId, ...contractRow(c) }).select().single();
+  if (error) throw error;
+  return toContract(data);
+}
+export async function updateContract(id: string, c: ContractFormValues): Promise<ContractRecord> {
+  const { data, error } = await supabase.from('employee_contracts').update(contractRow(c)).eq('id', id).select().single();
+  if (error) throw error;
+  return toContract(data);
+}
+
+/** Company time zone / country / default currency (readable by everyone in the company). */
+export async function getOrgSettings(): Promise<OrgSettings | null> {
+  const { data, error } = await supabase.from('organizations').select('time_zone,country,default_currency').maybeSingle();
+  if (error || !data) return null;
+  return { timeZone: data.time_zone as string, country: (data.country as string | null) ?? undefined, defaultCurrency: (data.default_currency as string | null) ?? undefined };
 }
