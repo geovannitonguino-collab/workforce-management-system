@@ -1,6 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Employee } from '@/types/workforce';
-import { formatDate, formatCurrency } from '@/lib/calculations';
+import { formatDate, getToday } from '@/lib/calculations';
+import { getContracts } from '@/lib/store';
+import { ContractRecord } from '@/types/contract';
+import { formatMoney } from '@/lib/payrollRun';
 import TimeClock from '@/components/TimeClock';
 import LeaveBalanceCard from '@/components/LeaveBalanceCard';
 import LeaveRequestForm from '@/components/LeaveRequestForm';
@@ -15,9 +18,26 @@ interface Props {
   onEmployeeUpdate?: () => void;
 }
 
-export default function EmployeeDashboard({ employee, onEmployeeUpdate }: Props) {
+export default function EmployeeDashboard({ employee: baseEmployee, onEmployeeUpdate }: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+  const [contract, setContract] = useState<ContractRecord | null | undefined>(undefined); // undefined = still loading
+
+  // The contract in force today is the single source for pay, vacation and PTO.
+  useEffect(() => {
+    let alive = true;
+    getContracts(baseEmployee.id).then(list => {
+      if (!alive) return;
+      const today = getToday();
+      setContract(list.find(c => c.effectiveFrom <= today) ?? null);
+    });
+    return () => { alive = false; };
+  }, [baseEmployee.id, refreshKey]);
+
+  const employee: Employee = contract
+    ? { ...baseEmployee, vacationAccrualRate: contract.vacationDaysPerMonth, paidPtoLimitHours: contract.ptoHoursPerYear }
+    : baseEmployee;
+  const clocks = contract === undefined || contract === null || contract.tracksTime;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -34,10 +54,12 @@ export default function EmployeeDashboard({ employee, onEmployeeUpdate }: Props)
             <span className="flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />Hired {formatDate(employee.hireDate)}</span>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold text-primary">{formatCurrency(employee.hourlyRate)}</p>
-          <p className="text-xs text-muted-foreground">per hour</p>
-        </div>
+        {contract && (
+          <div className="text-right">
+            <p className="text-2xl font-bold text-primary">{formatMoney(contract.amount, contract.currency)}</p>
+            <p className="text-xs text-muted-foreground">{contract.payType === 'hourly' ? 'per hour' : `per ${({ weekly: 'week', biweekly: '2 weeks', semimonthly: 'half month', monthly: 'month' } as const)[contract.payPeriod]}`}</p>
+          </div>
+        )}
       </div>
 
       {/* Analytics - re-reads on refresh */}
@@ -45,7 +67,7 @@ export default function EmployeeDashboard({ employee, onEmployeeUpdate }: Props)
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <TimeClock employeeId={employee.id} onUpdate={refresh} />
+          {clocks && <TimeClock employeeId={employee.id} onUpdate={refresh} />}
           <LeaveRequestForm employee={employee} onSubmit={refresh} />
           <TimeCorrections key={`corr-${refreshKey}`} employee={employee} />
         </div>

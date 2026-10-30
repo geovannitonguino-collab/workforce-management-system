@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getEmployees, getTimeEntries, getLeaveRequests, updateLeaveRequest, addEmployee, updateEmployee, getDepartments } from '@/lib/store';
+import { getEmployees, getLeaveRequests, updateLeaveRequest, addEmployee, updateEmployee, getDepartments } from '@/lib/store';
 import { Employee, LeaveRequest, Department, isDirectorRole, roleLabel } from '@/types/workforce';
-import { calculateDailySummary, calculatePayroll, getCurrentPeriod, getToday, formatCurrency, formatHours, formatDate } from '@/lib/calculations';
+import { getToday, formatDate } from '@/lib/calculations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,8 @@ import CompanyOverview from '@/components/CompanyOverview';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ClockNetworkSettings from '@/components/ClockNetworkSettings';
 import ContractDialog from '@/components/ContractDialog';
+import PayrollPanel from '@/components/PayrollPanel';
+import CompanyCalendar from '@/components/CompanyCalendar';
 import { Users, DollarSign, Download, PlusCircle, Edit, FileText, Clock, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Props { currentEmployee?: Employee; onEmployeeChange?: () => void; }
@@ -23,52 +25,27 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [contractFor, setContractFor] = useState<Employee | null>(null);
-  const [payrolls, setPayrolls] = useState<ReturnType<typeof calculatePayroll>[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
   const [pending, setPending] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const period = getCurrentPeriod();
 
-  // Bug fix #3: reload all data reactively — timeEntries included in deps
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [emps, timeEntries, leaveRequests, depts] = await Promise.all([
-        getEmployees(), getTimeEntries(), getLeaveRequests(), getDepartments(),
-      ]);
+      const [emps, leaveRequests, depts] = await Promise.all([getEmployees(), getLeaveRequests(), getDepartments()]);
       setEmployees(emps);
       setDepartments(depts);
       // A manager can only act on their own team (and never on their own request); directors act on everyone.
       const teamIds = new Set(emps.map(e => e.id));
       setPending(leaveRequests.filter(lr => lr.status === 'pending'
         && (isDirector || (teamIds.has(lr.employeeId) && lr.employeeId !== currentEmployee?.id))));
-      setPayrolls(emps.map(emp => {
-        const empEntries = timeEntries.filter(e => e.employeeId === emp.id);
-        const dates = [...new Set(empEntries.filter(e => e.date.startsWith(period)).map(e => e.date))];
-        return calculatePayroll(emp, dates.map(d => calculateDailySummary(empEntries, emp.id, d)), leaveRequests, period);
-      }));
     } finally { setLoading(false); }
-  }, [period, isDirector, currentEmployee?.id]);
+  }, [isDirector, currentEmployee?.id]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   const approve = async (id: string) => { await updateLeaveRequest(id, { status: 'approved' }); await loadAll(); };
   const reject  = async (id: string) => { await updateLeaveRequest(id, { status: 'rejected' }); await loadAll(); };
-
-  const totalPayroll = payrolls.reduce((s, p) => s + p.netPay, 0);
-  const totalHours   = payrolls.reduce((s, p) => s + p.totalWorkHours, 0);
-
-  const exportCSV = () => {
-    const csv = [
-      ['Employee','Hours','Rate','Gross','Paid Leave','Unpaid','Net'].join(','),
-      ...payrolls.map(p => [p.employeeName, p.totalWorkHours.toFixed(2), p.hourlyRate.toFixed(2),
-        p.grossPay.toFixed(2), p.paidLeaveAmount.toFixed(2), p.unpaidLeaveDeduction.toFixed(2), p.netPay.toFixed(2)].join(','))
-    ].join('\n');
-    const a = Object.assign(document.createElement('a'), {
-      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
-      download: `payroll-${period}.csv`,
-    });
-    a.click();
-  };
 
   if (loading) return (
     <div className="flex items-center justify-center py-32 gap-3 text-muted-foreground">
@@ -80,11 +57,11 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
     <div className="space-y-6 animate-fade-in">
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
-          { icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', label: 'Employees', value: String(employees.length), sub: isDirector ? `${employees.filter(e => isDirectorRole(e.role)).length} director · ${employees.filter(e => e.role === 'manager').length} manager` : 'your team' },
-          { icon: Clock, color: 'text-emerald-500', bg: 'bg-emerald-50', label: `Hours — ${period}`, value: formatHours(totalHours), sub: `avg ${employees.length ? (totalHours/employees.length).toFixed(1) : 0}h/person` },
-          { icon: DollarSign, color: 'text-primary', bg: 'bg-primary/10', label: 'Total Payroll', value: formatCurrency(totalPayroll), sub: period },
+          { icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', label: 'People', value: String(employees.length),
+            sub: isDirector ? `${employees.filter(e => isDirectorRole(e.role)).length} director · ${employees.filter(e => e.role === 'manager').length} manager` : 'your team' },
+          { icon: AlertCircle, color: 'text-amber-500', bg: 'bg-amber-50', label: 'Pending leave approvals', value: String(pending.length), sub: pending.length ? 'waiting for you' : 'all clear' },
         ].map(({ icon: Icon, color, bg, label, value, sub }) => (
           <div key={label} className="stat-card">
             <div className="flex items-start justify-between">
@@ -104,6 +81,8 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
       {isDirector && <BillingBanner key={employees.length} />}
 
       {isDirector && <ClockNetworkSettings />}
+
+      {isDirector && <CompanyCalendar />}
 
       {isDirector && <OrgStructure employees={employees} departments={departments} onChange={async () => { await loadAll(); onEmployeeChange?.(); }} />}
 
@@ -152,55 +131,15 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
         </div>
       )}
 
-      {/* Payroll report */}
-      <div className="stat-card">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" /> Payroll Report
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">{period}</p>
-          </div>
-          <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2 h-8 text-xs">
-            <Download className="h-3.5 w-3.5" /> Export CSV
-          </Button>
-        </div>
-        <div className="overflow-x-auto rounded-xl border border-border/60">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                {['Employee','Hours','Rate/hr','Gross','Leave+','Unpaid−','Net Pay'].map(h => (
-                  <TableHead key={h} className={`font-semibold text-xs ${h !== 'Employee' ? 'text-right' : ''}`}>{h}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payrolls.map(p => (
-                <TableRow key={p.employeeId} className="hover:bg-muted/30">
-                  <TableCell className="font-medium text-sm">{p.employeeName}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{formatHours(p.totalWorkHours)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(p.hourlyRate)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">{formatCurrency(p.grossPay)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm text-emerald-600 font-semibold">+{formatCurrency(p.paidLeaveAmount)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm text-red-500 font-semibold">−{formatCurrency(p.unpaidLeaveDeduction)}</TableCell>
-                  <TableCell className="text-right font-bold text-primary">{formatCurrency(p.netPay)}</TableCell>
-                </TableRow>
-              ))}
-              <TableRow className="bg-primary/4 border-t-2 border-primary/20">
-                <TableCell colSpan={6} className="text-right text-sm font-bold text-muted-foreground pr-4">Total</TableCell>
-                <TableCell className="text-right text-xl font-bold text-primary">{formatCurrency(totalPayroll)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+      <PayrollPanel employees={employees} currentEmployee={currentEmployee} isDirector={isDirector}
+        onOpenContract={setContractFor} reloadKey={reloadKey} />
 
       {/* Employee contracts */}
       <div className="stat-card">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <Users className="h-4 w-4 text-primary" /> Employee Contracts
+              <Users className="h-4 w-4 text-primary" /> People
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">{employees.length} members</p>
           </div>
@@ -210,7 +149,7 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                {['Name','Department','Rate','PTO','Accrual','Hired','Role',''].map(h => (
+                {['Name','Department','Hired','Role',''].map(h => (
                   <TableHead key={h} className="font-semibold text-xs">{h}</TableHead>
                 ))}
               </TableRow>
@@ -222,9 +161,6 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
                     <div><p className="text-sm font-medium">{emp.name}</p><p className="text-xs text-muted-foreground">{emp.email}</p>{emp.personalEmail && <p className="text-[11px] text-muted-foreground/80">Personal: {emp.personalEmail}</p>}</div>
                   </TableCell>
                   <TableCell className="text-sm">{departments.find(d => d.id === emp.departmentId)?.name ?? emp.department}</TableCell>
-                  <TableCell className="font-mono text-sm font-semibold text-primary">{formatCurrency(emp.hourlyRate)}</TableCell>
-                  <TableCell className="text-sm">{emp.paidPtoLimitHours}h</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{emp.vacationAccrualRate}d/mo</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(emp.hireDate)}</TableCell>
                   <TableCell>
                     <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isDirectorRole(emp.role) ? 'bg-amber-50 text-amber-700' : emp.role === 'manager' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'}`}>
@@ -249,7 +185,7 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
       </div>
 
       <ContractDialog employee={contractFor} canEdit={!!contractFor && (isDirector || contractFor.id !== currentEmployee?.id)}
-        onClose={() => setContractFor(null)} onSaved={() => onEmployeeChange?.()} />
+        onClose={() => setContractFor(null)} onSaved={() => { setReloadKey(k => k + 1); onEmployeeChange?.(); }} />
     </div>
   );
 }
@@ -262,7 +198,7 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: (cr
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [f, setF] = useState({ name:'', email:'', personalEmail:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
+  const [f, setF] = useState({ name:'', email:'', personalEmail:'', department:'', hireDate:'' });
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setF(prev => ({ ...prev, [k]: e.target.value }));
 
   const submit = async () => {
@@ -271,16 +207,15 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: (cr
       // Bug fix #4: correct defaults — 0.416 days/mo and 40h PTO
       const created = await addEmployee({
         name: f.name, email: f.email, personalEmail: f.personalEmail.trim() || undefined, role: 'employee',
-        hourlyRate: parseFloat(f.hourlyRate) || 0,
-        vacationAccrualRate: parseFloat(f.vacationAccrualRate) || 0.416,
-        paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || 40,
+        // pay, vacation and PTO now live in the contract (opened right after saving)
+        hourlyRate: 0, vacationAccrualRate: 0, paidPtoLimitHours: 0,
         hireDate: f.hireDate || getToday(),
         department: allowed.find(d => d.id === deptId)?.name ?? f.department,
         departmentId: deptId || undefined,
       });
       setOpen(false);
       setDeptId('');
-      setF({ name:'', email:'', personalEmail:'', department:'', hourlyRate:'', paidPtoLimitHours:'', vacationAccrualRate:'', hireDate:'' });
+      setF({ name:'', email:'', personalEmail:'', department:'', hireDate:'' });
       onAdd(created);
     } catch (e) {
       const msg = String((e as { message?: string })?.message ?? '');
@@ -312,13 +247,10 @@ function AddEmployeeDialog({ onAdd, currentEmployee, departments }: { onAdd: (cr
               )}
             </div>
             <div><Label>Hire Date</Label><Input type="date" value={f.hireDate} onChange={set('hireDate')} /></div>
-            <div><Label>Hourly Rate ($)</Label><Input type="number" step="0.01" value={f.hourlyRate} onChange={set('hourlyRate')} placeholder="35.00" /></div>
-            <div><Label>PTO Limit (hrs/yr)</Label><Input type="number" value={f.paidPtoLimitHours} onChange={set('paidPtoLimitHours')} placeholder="40" /></div>
-            <div className="col-span-2"><Label>Vacation Accrual (days/month)</Label><Input type="number" step="0.001" value={f.vacationAccrualRate} onChange={set('vacationAccrualRate')} placeholder="0.416" /></div>
           </div>
           {err && <p className="text-sm text-destructive">{err}</p>}
           <Button className="w-full" onClick={submit} disabled={!f.name || !f.email || saving || (departments.length > 0 && !deptId)}>
-            {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Add Employee
+            {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Add and set up contract
           </Button>
         </div>
       </DialogContent>
@@ -358,9 +290,6 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
     setSaving(true); setErr(null);
     try {
       await updateEmployee(employee.id, {
-        hourlyRate: parseFloat(f.hourlyRate) || employee.hourlyRate,
-        paidPtoLimitHours: parseFloat(f.paidPtoLimitHours) || employee.paidPtoLimitHours,
-        vacationAccrualRate: parseFloat(f.vacationAccrualRate) || employee.vacationAccrualRate,
         ...(isDirector && !employee.departmentId ? { department: f.department } : {}),
         ...(isDirector && f.email.trim() && f.email.trim().toLowerCase() !== employee.email.toLowerCase() ? { email: f.email.trim() } : {}),
         ...(f.personalEmail.trim() !== (employee.personalEmail ?? '') ? { personalEmail: f.personalEmail.trim() } : {}),
@@ -411,11 +340,7 @@ function EditEmployeeDialog({ employee, onSave, isDirector }: { employee: Employ
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Hourly Rate ($)</Label><Input type="number" step="0.01" value={f.hourlyRate} onChange={set('hourlyRate')} /></div>
-            <div><Label>PTO Limit (hrs/yr)</Label><Input type="number" value={f.paidPtoLimitHours} onChange={set('paidPtoLimitHours')} /></div>
-          </div>
-          <div><Label>Vacation Accrual (days/month)</Label><Input type="number" step="0.001" value={f.vacationAccrualRate} onChange={set('vacationAccrualRate')} /></div>
+          <p className="text-xs text-muted-foreground">Pay, vacation and PTO are edited in the person's <strong>Contract</strong>.</p>
           {err && <p className="text-sm text-destructive">{err}</p>}
           <Button className="w-full" onClick={submit} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />} Save Changes

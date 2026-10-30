@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import type { ContractFormValues, ContractRecord, OrgSettings, Weekday, Surcharges } from '@/types/contract';
+import type { AdjustmentKind, ContractFormValues, ContractRecord, OrgSettings, Weekday, Surcharges } from '@/types/contract';
+import type { PayAdjustmentRecord } from '@/lib/payrollRun';
 import { Employee, TimeEntry, LeaveRequest, MedicalProof, TimeCorrection, AuditEvent, BillingStatus, Department, CorrectionKind, ClockAction } from '@/types/workforce';
 
 function toEmployee(r: Record<string, unknown>): Employee {
@@ -371,4 +372,47 @@ export async function getOrgSettings(): Promise<OrgSettings | null> {
   const { data, error } = await supabase.from('organizations').select('time_zone,country,default_currency').maybeSingle();
   if (error || !data) return null;
   return { timeZone: data.time_zone as string, country: (data.country as string | null) ?? undefined, defaultCurrency: (data.default_currency as string | null) ?? undefined };
+}
+
+// ---------------------------------------------------------------- commissions, bonuses, deductions
+function toAdjustment(r: Record<string, unknown>): PayAdjustmentRecord {
+  return {
+    id: r.id as string, employeeId: r.employee_id as string, date: r.date as string, kind: r.kind as AdjustmentKind,
+    amount: Number(r.amount), note: (r.note as string | null) ?? undefined, createdBy: (r.created_by as string | null) ?? undefined,
+  };
+}
+export async function getPayAdjustments(): Promise<PayAdjustmentRecord[]> {
+  const { data, error } = await supabase.from('pay_adjustments').select('*').order('date', { ascending: false });
+  if (error) return [];
+  return (data ?? []).map(toAdjustment);
+}
+export async function addPayAdjustment(employeeId: string, a: { date: string; kind: AdjustmentKind; amount: number; note?: string }): Promise<void> {
+  const { error } = await supabase.from('pay_adjustments').insert({
+    employee_id: employeeId, date: a.date, kind: a.kind, amount: a.amount, note: a.note?.trim() || null,
+  });
+  if (error) throw error;
+}
+export async function deletePayAdjustment(id: string): Promise<void> {
+  const { error } = await supabase.from('pay_adjustments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ---------------------------------------------------------------- company calendar and settings
+export interface Holiday { id: string; date: string; name: string }
+export async function getHolidays(): Promise<Holiday[]> {
+  const { data, error } = await supabase.from('org_holidays').select('*').order('date');
+  if (error) return [];
+  return (data ?? []).map(r => ({ id: r.id as string, date: r.date as string, name: (r.name as string) ?? '' }));
+}
+export async function addHoliday(date: string, name: string): Promise<void> {
+  const { error } = await supabase.from('org_holidays').insert({ date, name: name.trim() });
+  if (error) throw error;
+}
+export async function deleteHoliday(id: string): Promise<void> {
+  const { error } = await supabase.from('org_holidays').delete().eq('id', id);
+  if (error) throw error;
+}
+export async function setOrgSettings(timeZone: string, country: string, currency: string): Promise<void> {
+  const { error } = await supabase.rpc('set_org_settings', { p_time_zone: timeZone, p_country: country, p_currency: currency || null });
+  if (error) throw error;
 }
