@@ -55,17 +55,17 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
-        <div className="container flex h-16 items-center justify-between">
+      <header className="app-header sticky top-0 z-50">
+        <div className="container flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-2 min-h-16">
           <div className="flex items-center gap-2">
-            <img src={geovannixLogo} alt="Geovannix" className="h-9" />
-            <div>
-              <h1 className="text-base font-bold text-foreground leading-none">{orgName ?? 'Geovannix'}</h1>
-              <p className="text-xs text-muted-foreground">Workforce Management</p>
+            <img src={geovannixLogo} alt="Geovannix" className="h-8 sm:h-9" />
+            <div className="min-w-0">
+              <h1 className="font-serif text-lg font-semibold text-foreground leading-none truncate max-w-[10rem] sm:max-w-none">{orgName ?? 'Geovannix'}</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">Workforce Management</p>
             </div>
           </div>
 
-          <div className="flex gap-1 bg-muted rounded-lg p-1">
+          <div className="flex gap-1 bg-muted/70 border border-border/60 rounded-full p-1 order-3 sm:order-none w-full sm:w-auto justify-center">
             <Button variant={view === 'employee' ? 'default' : 'ghost'} size="sm" onClick={() => setView('employee')}>
               <User className="h-4 w-4" /> Employee
             </Button>
@@ -76,15 +76,15 @@ export default function Index() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <span className="text-sm text-muted-foreground hidden sm:inline">{currentEmployee?.name ?? session.user.email}</span>
             <ChangePasswordDialog />
-            <Button variant="outline" size="sm" onClick={signOut}><LogOut className="h-4 w-4" /> Sign out</Button>
+            <Button variant="outline" size="sm" onClick={signOut} aria-label="Sign out"><LogOut className="h-4 w-4" /><span className="hidden sm:inline"> Sign out</span></Button>
           </div>
         </div>
       </header>
 
-      <main className="container py-6">
+      <main className="container py-4 sm:py-6">
         {loading ? (
           <div className="flex items-center justify-center py-32 gap-3 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />

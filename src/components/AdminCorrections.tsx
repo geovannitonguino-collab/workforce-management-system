@@ -46,7 +46,7 @@ export default function AdminCorrections({ employees, onResolved, showAudit: can
   return (
     <div className="space-y-4">
       {items.length > 0 && (
-        <div className="stat-card border-amber-200 bg-amber-50/40">
+        <div className="stat-card border-secondary/50 bg-accent/50">
           <div className="flex items-center gap-2 mb-3">
             <FilePenLine className="h-5 w-5 text-amber-500" />
             <h3 className="text-base font-semibold">Time Correction Requests</h3>
@@ -55,7 +55,7 @@ export default function AdminCorrections({ employees, onResolved, showAudit: can
           {error && <p className="text-sm text-destructive mb-2">{error}</p>}
           <div className="space-y-2">
             {items.map(c => (
-              <div key={c.id} className="bg-white border border-amber-100 rounded-xl p-3.5 space-y-2">
+              <div key={c.id} className="bg-card border border-secondary/40 rounded-xl p-3.5 space-y-2">
                 <p className="text-sm font-semibold">{name(c.employeeId)}</p>
                 <p className="text-sm">{describe(c)}</p>
                 <p className="text-xs text-muted-foreground">"{c.reason}"</p>

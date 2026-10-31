@@ -101,7 +101,7 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
   return (
     <div className="stat-card space-y-6">
       {error && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-800">
+        <div className="rounded-lg border border-secondary/50 bg-accent/60 p-3 text-sm text-amber-800">
           {error}
           <span className="block text-xs mt-1">Forgot to punch? Use "Request correction". / ¿Olvidaste fichar? Usa "Request correction".</span>
         </div>

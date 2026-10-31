@@ -48,7 +48,7 @@ export default function CompanyOverview({ teamIds, departments }: Props) {
             {rows.map(r => (
               <TableRow key={r.id}>
                 <TableCell className="text-sm font-medium">
-                  {r.name}{team.has(r.id) && <span className="ml-2 text-[10px] rounded-full bg-violet-50 text-violet-700 px-2 py-0.5">your team</span>}
+                  {r.name}{team.has(r.id) && <span className="ml-2 text-[10px] rounded-full bg-primary/10 text-primary px-2 py-0.5">your team</span>}
                 </TableCell>
                 <TableCell className="text-sm">{departments.find(d => d.id === r.departmentId)?.name ?? '—'}</TableCell>
                 <TableCell className="text-sm">{roleLabel(r.role)}</TableCell>

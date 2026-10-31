@@ -84,7 +84,7 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
     <div className="stat-card space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-base font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Payroll</h3>
-        <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="sm:ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Select value={kind} onValueChange={v => changeKind(v as PeriodKind)}>
             <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -92,18 +92,18 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
             </SelectContent>
           </Select>
           <Button size="sm" variant="outline" className="h-8 w-8 p-0" aria-label="Previous period" onClick={() => setPeriod(shiftPeriod(kind, period, -1))}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="text-sm font-medium min-w-[11rem] text-center">{periodLabel(period)}</span>
+          <span className="text-sm font-medium flex-1 sm:flex-none sm:min-w-[11rem] text-center">{periodLabel(period)}</span>
           <Button size="sm" variant="outline" className="h-8 w-8 p-0" aria-label="Next period" onClick={() => setPeriod(shiftPeriod(kind, period, 1))}><ChevronRight className="h-4 w-4" /></Button>
           <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={exportCSV} disabled={!run}><Download className="h-3.5 w-3.5" /> CSV</Button>
         </div>
       </div>
 
       {kind === 'custom' && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Label className="text-xs">From</Label>
-          <Input type="date" className="h-8 w-40" value={period.from} onChange={e => e.target.value && setPeriod(p => ({ ...p, from: e.target.value, to: p.to < e.target.value ? e.target.value : p.to }))} />
+          <Input type="date" className="h-8 w-36" value={period.from} onChange={e => e.target.value && setPeriod(p => ({ ...p, from: e.target.value, to: p.to < e.target.value ? e.target.value : p.to }))} />
           <Label className="text-xs">To</Label>
-          <Input type="date" className="h-8 w-40" value={period.to} min={period.from} onChange={e => e.target.value && setPeriod(p => ({ ...p, to: e.target.value }))} />
+          <Input type="date" className="h-8 w-36" value={period.to} min={period.from} onChange={e => e.target.value && setPeriod(p => ({ ...p, to: e.target.value }))} />
         </div>
       )}
 
@@ -114,9 +114,9 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
           {run.totals.length > 0 && (
             <div className="flex flex-wrap gap-3">
               {run.totals.map(t => (
-                <div key={t.currency} className="rounded-xl border border-border/60 px-4 py-2">
+                <div key={t.currency} className="rounded-2xl border border-border/70 bg-background/60 px-4 py-3">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Total {t.currency}</p>
-                  <p className="text-xl font-bold text-primary">{formatMoney(t.gross, t.currency)}</p>
+                  <p className="display-num text-3xl font-semibold text-primary">{formatMoney(t.gross, t.currency)}</p>
                   <p className="text-xs text-muted-foreground">{t.people} {t.people === 1 ? 'person' : 'people'} · {t.hours} h</p>
                   {(t.net !== t.gross || t.employerCost !== t.gross) && (
                     <p className="text-xs text-muted-foreground">Net to people {formatMoney(t.net, t.currency)} · company cost {formatMoney(t.employerCost, t.currency)}</p>
@@ -128,7 +128,7 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
           {run.totals.length > 1 && <p className="text-xs text-muted-foreground">Different currencies are never added together.</p>}
 
           {run.withoutContract.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-sm">
+            <div className="rounded-lg border border-secondary/50 bg-accent/50 p-3 text-sm">
               <p className="font-medium flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-amber-500" /> {run.withoutContract.length} without a contract: not included in the payroll</p>
               <div className="flex flex-wrap gap-2 mt-2">
                 {run.withoutContract.map(e => (
@@ -262,7 +262,7 @@ function PersonDialog({ row, period, company, adjustments, canEdit, onClose, onO
           </div>
 
           {res.warnings.length > 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-1">
+            <div className="rounded-lg border border-secondary/50 bg-accent/50 p-3 space-y-1">
               {res.warnings.map(w => <p key={w} className="text-xs flex gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />{w}</p>)}
             </div>
           )}

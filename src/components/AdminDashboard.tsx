@@ -53,23 +53,23 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
   );
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-5 sm:space-y-6 rise">
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
-          { icon: Users, color: 'text-blue-500', bg: 'bg-blue-50', label: 'People', value: String(employees.length),
+          { icon: Users, color: 'text-primary', bg: 'bg-primary/10', label: 'People', value: String(employees.length),
             sub: isDirector ? `${employees.filter(e => isDirectorRole(e.role)).length} director · ${employees.filter(e => e.role === 'manager').length} manager` : 'your team' },
-          { icon: AlertCircle, color: 'text-amber-500', bg: 'bg-amber-50', label: 'Pending leave approvals', value: String(pending.length), sub: pending.length ? 'waiting for you' : 'all clear' },
+          { icon: AlertCircle, color: 'text-foreground', bg: 'bg-secondary/40', label: 'Pending leave approvals', value: String(pending.length), sub: pending.length ? 'waiting for you' : 'all clear' },
         ].map(({ icon: Icon, color, bg, label, value, sub }) => (
           <div key={label} className="stat-card">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
-                <p className="text-3xl font-bold text-foreground mt-2">{value}</p>
+                <p className="display-num text-5xl font-semibold text-foreground mt-2 leading-none">{value}</p>
                 <p className="text-xs text-muted-foreground mt-1">{sub}</p>
               </div>
-              <div className={`h-10 w-10 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
+              <div className={`h-11 w-11 rounded-2xl ${bg} flex items-center justify-center shrink-0`}>
                 <Icon className={`h-5 w-5 ${color}`} />
               </div>
             </div>
@@ -89,7 +89,7 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
 
       {/* Pending leave approvals */}
       {pending.length > 0 && (
-        <div className="stat-card border-amber-200 bg-amber-50/40">
+        <div className="stat-card border-secondary/50 bg-accent/50">
           <div className="flex items-center gap-2 mb-4">
             <AlertCircle className="h-5 w-5 text-amber-500" />
             <h3 className="text-base font-semibold text-foreground">Pending Approvals</h3>
@@ -101,23 +101,23 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
             {pending.map(lr => {
               const emp = employees.find(e => e.id === lr.employeeId);
               return (
-                <div key={lr.id} className="flex items-center justify-between bg-white border border-amber-100 rounded-xl p-3.5 gap-3">
+                <div key={lr.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-card border border-secondary/40 rounded-xl p-3.5 gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{emp?.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-2 mt-0.5 text-xs text-muted-foreground">
                       <span className="capitalize font-medium">{lr.category}</span>
                       <span>·</span><span>{lr.hours}h</span>
                       <span>·</span><span>{formatDate(lr.startDate)}</span>
                       {lr.unpaidHours > 0 && <span className="text-destructive font-medium">{lr.unpaidHours}h unpaid</span>}
                     </div>
                   </div>
-                  <div className="flex gap-2 shrink-0">
+                  <div className="flex gap-2 sm:shrink-0">
                     <Button size="sm" onClick={() => approve(lr.id)}
-                      className="h-8 gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white">
+                      className="h-9 flex-1 sm:flex-none gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Approve
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => reject(lr.id)}
-                      className="h-8 gap-1.5 border-red-200 text-red-600 hover:bg-red-50">
+                      className="h-9 flex-1 sm:flex-none gap-1.5 border-red-200 text-red-600 hover:bg-red-50">
                       <XCircle className="h-3.5 w-3.5" /> Reject
                     </Button>
                   </div>
@@ -160,7 +160,7 @@ export default function AdminDashboard({ currentEmployee, onEmployeeChange }: Pr
                   <TableCell className="text-sm">{departments.find(d => d.id === emp.departmentId)?.name ?? emp.department}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(emp.hireDate)}</TableCell>
                   <TableCell>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isDirectorRole(emp.role) ? 'bg-amber-50 text-amber-700' : emp.role === 'manager' ? 'bg-violet-50 text-violet-700' : 'bg-blue-50 text-blue-700'}`}>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isDirectorRole(emp.role) ? 'bg-secondary/25 text-foreground' : emp.role === 'manager' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                       {roleLabel(emp.role)}
                     </span>
                   </TableCell>

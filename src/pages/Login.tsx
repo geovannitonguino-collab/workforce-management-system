@@ -31,13 +31,32 @@ export default function Login() {
   const switchMode = (m: 'signin' | 'forgot') => { setMode(m); setError(null); setSent(false); };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <form onSubmit={submit} className="stat-card w-full max-w-sm space-y-4">
+    <div className="min-h-dvh grid lg:grid-cols-[1.1fr_1fr]">
+      <aside className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-primary text-primary-foreground p-12">
+        <svg aria-hidden className="absolute inset-0 h-full w-full opacity-[0.22]" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid slice">
+          <defs><pattern id="ledger" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M0 40H40M40 0V40" stroke="currentColor" strokeWidth=".5" fill="none" /></pattern></defs>
+          <rect width="400" height="600" fill="url(#ledger)" />
+          <circle cx="300" cy="140" r="120" fill="none" stroke="hsl(36 94% 56%)" strokeWidth="1.2" />
+          <circle cx="300" cy="140" r="80" fill="none" stroke="hsl(36 94% 56%)" strokeWidth=".8" />
+          <path d="M0 460C90 400 160 520 260 430S360 360 400 380" fill="none" stroke="hsl(36 94% 56%)" strokeWidth="1.6" />
+        </svg>
+        <div className="relative flex items-center gap-3">
+          <span className="rounded-xl bg-card p-2"><img src={geovannixLogo} alt="Geovannix" className="h-8" /></span>
+          <span className="font-serif text-xl">Trackly</span>
+        </div>
+        <div className="relative max-w-md">
+          <p className="display-num text-5xl xl:text-6xl leading-[1.02] font-medium">Horas claras.<br /><span className="text-secondary">Nómina sin sorpresas.</span></p>
+          <p className="mt-6 text-primary-foreground/75 text-base leading-relaxed">Equipos, contratos y pagos en un solo lugar, con las reglas que tu empresa define.</p>
+        </div>
+        <p className="relative text-xs text-primary-foreground/60">by Geovannix</p>
+      </aside>
+      <div className="flex items-center justify-center p-4 sm:p-8">
+      <form onSubmit={submit} className="stat-card w-full max-w-sm space-y-4 rise">
         <div className="flex items-center gap-2">
           <img src={geovannixLogo} alt="Geovannix" className="h-9" />
           <div>
-            <h1 className="text-base font-bold leading-none">Geovannix</h1>
-            <p className="text-xs text-muted-foreground">Workforce Management</p>
+            <h1 className="font-serif text-lg font-semibold leading-none">Trackly</h1>
+            <p className="text-xs text-muted-foreground">by Geovannix</p>
           </div>
         </div>
 
@@ -89,6 +108,7 @@ export default function Login() {
           <Link className="underline" to="/terms">Términos / Terms</Link> · <Link className="underline" to="/privacy">Privacidad / Privacy</Link>
         </p>
       </form>
+      </div>
     </div>
   );
 }

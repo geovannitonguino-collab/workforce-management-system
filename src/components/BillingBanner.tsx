@@ -29,7 +29,7 @@ export default function BillingBanner() {
   if (!warn && b.maxEmployees && b.employeeCount >= b.maxEmployees) message += ' Employee limit reached.';
 
   return (
-    <div className={`stat-card flex items-center gap-3 ${warn ? 'border-amber-200 bg-amber-50/40' : ''}`}>
+    <div className={`stat-card flex items-center gap-3 ${warn ? 'border-secondary/50 bg-accent/50' : ''}`}>
       <CreditCard className={`h-5 w-5 shrink-0 ${warn ? 'text-amber-500' : 'text-primary'}`} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{b.planName} · {usage}</p>
