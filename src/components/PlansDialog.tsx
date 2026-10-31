@@ -73,8 +73,8 @@ export default function PlansDialog({ open, currentPlanId, people: initialPeople
                       ) : p.trialDays > 0 ? <p className="text-lg font-semibold">Free</p>
                         : <p className="text-lg font-semibold text-muted-foreground">Contact us for the price</p>}
                     </div>
-                    <p className="text-xs flex items-center gap-1"><Check className="h-3.5 w-3.5 text-emerald-600" />{p.maxEmployees ? `Up to ${p.maxEmployees} people` : 'No limit on people'}</p>
-                    {p.trialDays > 0 && <p className="text-xs flex items-center gap-1"><Check className="h-3.5 w-3.5 text-emerald-600" />{p.trialDays}-day free trial</p>}
+                    <p className="text-xs flex items-center gap-1"><Check className="h-3.5 w-3.5 text-success" />{p.maxEmployees ? `Up to ${p.maxEmployees} people` : 'No limit on people'}</p>
+                    {p.trialDays > 0 && <p className="text-xs flex items-center gap-1"><Check className="h-3.5 w-3.5 text-success" />{p.trialDays}-day free trial</p>}
                     {!current && p.trialDays === 0 && <Button size="sm" className="w-full" onClick={() => setChosen(p)}>Choose {p.name}</Button>}
                   </div>
                 );

@@ -78,7 +78,7 @@ export default function PayrollEstimate({ employee }: Props) {
             <div className="flex justify-between px-4 py-3 bg-primary/5"><span className="font-semibold">{res.withheld > 0 ? 'Estimated net pay' : 'Estimated total'}</span><span className="text-2xl font-bold text-primary">{m(res.net)}</span></div>
           </div>
           {res.warnings.map(w => (
-            <p key={w} className="text-xs flex gap-1.5 text-amber-700"><AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />{w}</p>
+            <p key={w} className="text-xs flex gap-1.5 text-foreground"><AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />{w}</p>
           ))}
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">Estimate calculated from your contract. It is not a legal payroll document.</p>

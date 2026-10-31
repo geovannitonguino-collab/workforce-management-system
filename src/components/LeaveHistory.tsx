@@ -11,9 +11,9 @@ interface Props { employee: Employee; }
 
 const catLabels: Record<string, string> = { pto: 'PTO', sick: 'Sick Leave', vacation: 'Vacation', personal: 'Personal', family: 'Family Day', other: 'Other' };
 const catColors: Record<string, string> = {
-  pto: 'bg-blue-100 text-blue-800', sick: 'bg-orange-100 text-orange-800',
-  vacation: 'bg-emerald-100 text-emerald-800', personal: 'bg-purple-100 text-purple-800',
-  family: 'bg-pink-100 text-pink-800', other: 'bg-slate-100 text-slate-800',
+  pto: 'bg-primary/10 text-primary', sick: 'bg-secondary/30 text-foreground',
+  vacation: 'bg-success/15 text-success', personal: 'bg-[hsl(var(--break)/0.15)] text-foreground',
+  family: 'bg-destructive/10 text-destructive', other: 'bg-muted text-muted-foreground',
 };
 const statusVariant: Record<string, 'default' | 'secondary' | 'destructive'> = {
   approved: 'default', pending: 'secondary', rejected: 'destructive',
@@ -147,7 +147,7 @@ export default function LeaveHistory({ employee }: Props) {
                 <div><p className="text-muted-foreground">Payment</p>
                   <p className="font-medium">{selected.unpaidHours > 0
                     ? <span className="text-destructive">{selected.unpaidHours}h unpaid</span>
-                    : <span className="text-emerald-600">Fully paid</span>}</p>
+                    : <span className="text-success">Fully paid</span>}</p>
                 </div>
               </div>
               {selected.reason && <div><p className="text-sm text-muted-foreground mb-1">Reason</p><p className="text-sm bg-muted/50 p-2.5 rounded-lg">{selected.reason}</p></div>}

@@ -48,9 +48,9 @@ export default function AdminCorrections({ employees, onResolved, showAudit: can
       {items.length > 0 && (
         <div className="stat-card border-secondary/50 bg-accent/50">
           <div className="flex items-center gap-2 mb-3">
-            <FilePenLine className="h-5 w-5 text-amber-500" />
+            <FilePenLine className="h-5 w-5 text-warning" />
             <h3 className="text-base font-semibold">Time Correction Requests</h3>
-            <span className="ml-auto text-xs font-semibold bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5">{items.length} pending</span>
+            <span className="ml-auto text-xs font-semibold bg-secondary/25 text-foreground border border-secondary/50 rounded-full px-2.5 py-0.5">{items.length} pending</span>
           </div>
           {error && <p className="text-sm text-destructive mb-2">{error}</p>}
           <div className="space-y-2">

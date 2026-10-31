@@ -129,7 +129,7 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
 
           {run.withoutContract.length > 0 && (
             <div className="rounded-lg border border-secondary/50 bg-accent/50 p-3 text-sm">
-              <p className="font-medium flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-amber-500" /> {run.withoutContract.length} without a contract: not included in the payroll</p>
+              <p className="font-medium flex items-center gap-1.5"><AlertTriangle className="h-4 w-4 text-warning" /> {run.withoutContract.length} without a contract: not included in the payroll</p>
               <div className="flex flex-wrap gap-2 mt-2">
                 {run.withoutContract.map(e => (
                   <Button key={e.id} size="sm" variant="outline" className="h-7 text-xs" onClick={() => onOpenContract(e)}>{e.name}: set up contract</Button>
@@ -155,7 +155,7 @@ export default function PayrollPanel({ employees, currentEmployee, isDirector, o
                     <TableRow key={r.employee.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setDetail(r.employee.id)}>
                       <TableCell className="font-medium text-sm">
                         {r.employee.name}
-                        {res.warnings.length > 0 && <AlertTriangle className="inline h-3.5 w-3.5 ml-1.5 text-amber-500" aria-label="Has warnings" />}
+                        {res.warnings.length > 0 && <AlertTriangle className="inline h-3.5 w-3.5 ml-1.5 text-warning" aria-label="Has warnings" />}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">{res.totalHours}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{m(res.pay.base)}</TableCell>
@@ -263,7 +263,7 @@ function PersonDialog({ row, period, company, adjustments, canEdit, onClose, onO
 
           {res.warnings.length > 0 && (
             <div className="rounded-lg border border-secondary/50 bg-accent/50 p-3 space-y-1">
-              {res.warnings.map(w => <p key={w} className="text-xs flex gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />{w}</p>)}
+              {res.warnings.map(w => <p key={w} className="text-xs flex gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />{w}</p>)}
             </div>
           )}
 

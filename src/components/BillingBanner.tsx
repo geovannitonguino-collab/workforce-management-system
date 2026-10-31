@@ -30,7 +30,7 @@ export default function BillingBanner() {
 
   return (
     <div className={`stat-card flex items-center gap-3 ${warn ? 'border-secondary/50 bg-accent/50' : ''}`}>
-      <CreditCard className={`h-5 w-5 shrink-0 ${warn ? 'text-amber-500' : 'text-primary'}`} />
+      <CreditCard className={`h-5 w-5 shrink-0 ${warn ? 'text-warning' : 'text-primary'}`} />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold">{b.planName} · {usage}</p>
         <p className="text-xs text-muted-foreground">{message}</p>

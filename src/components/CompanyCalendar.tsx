@@ -104,7 +104,7 @@ export default function CompanyCalendar() {
           <Button size="sm" className="h-8" onClick={add} disabled={!date || busy}>Add holiday</Button>
         </div>
       </div>
-      {msg && <p className={`text-xs ${msg.ok ? 'text-emerald-600' : 'text-destructive'}`}>{msg.text}</p>}
+      {msg && <p className={`text-xs ${msg.ok ? 'text-success' : 'text-destructive'}`}>{msg.text}</p>}
     </div>
   );
 }

@@ -530,7 +530,7 @@ export default function ContractDialog({ employee, canEdit, onClose, onSaved }: 
             <ContractFiles employeeId={employee.id} canEdit={canEdit} />
 
             {error && <p className="text-sm text-destructive">{error}</p>}
-            {saved && <p className="text-sm text-emerald-600">Saved.</p>}
+            {saved && <p className="text-sm text-success">Saved.</p>}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={onClose}>Close</Button>
               {canEdit && (

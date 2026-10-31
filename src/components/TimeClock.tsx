@@ -71,11 +71,11 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
     ? Math.max(0, Math.floor((now.getTime() - new Date(lastEntry.timestamp).getTime()) / 1000)) : 0;
   const h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
 
-  const timerColor   = status.isOnLunch ? 'text-amber-500' : status.isOnBreak ? 'text-blue-400' : status.isClockedIn ? 'text-emerald-500' : 'text-muted-foreground';
-  const timerBg     = status.isOnLunch ? 'bg-amber-500/10' : status.isOnBreak ? 'bg-blue-400/10' : status.isClockedIn ? 'bg-emerald-500/10' : 'bg-muted/30';
+  const timerColor   = status.isOnLunch ? 'text-warning' : status.isOnBreak ? 'text-[hsl(var(--break))]' : status.isClockedIn ? 'text-success' : 'text-muted-foreground';
+  const timerBg     = status.isOnLunch ? 'bg-warning/10' : status.isOnBreak ? 'bg-[hsl(var(--break)/0.12)]' : status.isClockedIn ? 'bg-success/10' : 'bg-muted/30';
   const timingLabel = status.isOnLunch ? 'TIMING LUNCH' : status.isOnBreak ? 'TIMING BREAK' : status.isClockedIn ? 'TIMING WORK SESSION' : 'OFF CLOCK';
   const statusLabel = status.isOnLunch ? 'On Lunch' : status.isOnBreak ? 'On Break' : status.isClockedIn ? 'Working' : 'Off Clock';
-  const statusColor = status.isOnLunch ? 'text-amber-500' : status.isOnBreak ? 'text-blue-400' : status.isClockedIn ? 'text-emerald-500' : 'text-muted-foreground';
+  const statusColor = status.isOnLunch ? 'text-warning' : status.isOnBreak ? 'text-[hsl(var(--break))]' : status.isClockedIn ? 'text-success' : 'text-muted-foreground';
 
   // Compute totals from today's entries
   const totals = useMemo(() => {
@@ -101,7 +101,7 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
   return (
     <div className="stat-card space-y-6">
       {error && (
-        <div className="rounded-lg border border-secondary/50 bg-accent/60 p-3 text-sm text-amber-800">
+        <div className="rounded-lg border border-secondary/50 bg-accent/60 p-3 text-sm text-foreground">
           {error}
           <span className="block text-xs mt-1">Forgot to punch? Use "Request correction". / ¿Olvidaste fichar? Usa "Request correction".</span>
         </div>
@@ -111,7 +111,7 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
           <Clock className="h-5 w-5 text-primary" /> Time Clock
         </h3>
         <span className={`text-sm font-medium ${statusColor}`}>
-          {status.isClockedIn && <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />}
+          {status.isClockedIn && <span className="inline-block w-2 h-2 rounded-full bg-success mr-1.5 animate-pulse" />}
           {statusLabel}
         </span>
       </div>
@@ -182,17 +182,17 @@ export default function TimeClock({ employeeId, dailyGoalHours = 8, onUpdate }: 
             ))}
           </div>
           <div className="grid grid-cols-3 gap-2 text-center pt-2">
-            <div className="rounded-md bg-emerald-500/10 p-2">
-              <p className="text-[10px] uppercase tracking-wider text-emerald-500 font-medium">Work</p>
-              <p className="font-mono font-bold text-sm text-emerald-500">{formatMs(totals.workMs)}</p>
+            <div className="rounded-md bg-success/10 p-2">
+              <p className="text-[10px] uppercase tracking-wider text-success font-medium">Work</p>
+              <p className="font-mono font-bold text-sm text-success">{formatMs(totals.workMs)}</p>
             </div>
-            <div className="rounded-md bg-blue-400/10 p-2">
-              <p className="text-[10px] uppercase tracking-wider text-blue-400 font-medium">Breaks</p>
-              <p className="font-mono font-bold text-sm text-blue-400">{formatMs(totals.breakMs)}</p>
+            <div className="rounded-md bg-[hsl(var(--break)/0.12)] p-2">
+              <p className="text-[10px] uppercase tracking-wider text-[hsl(var(--break))] font-medium">Breaks</p>
+              <p className="font-mono font-bold text-sm text-[hsl(var(--break))]">{formatMs(totals.breakMs)}</p>
             </div>
-            <div className="rounded-md bg-amber-500/10 p-2">
-              <p className="text-[10px] uppercase tracking-wider text-amber-500 font-medium">Lunch</p>
-              <p className="font-mono font-bold text-sm text-amber-500">{formatMs(totals.lunchMs)}</p>
+            <div className="rounded-md bg-warning/10 p-2">
+              <p className="text-[10px] uppercase tracking-wider text-warning font-medium">Lunch</p>
+              <p className="font-mono font-bold text-sm text-warning">{formatMs(totals.lunchMs)}</p>
             </div>
           </div>
         </div>
