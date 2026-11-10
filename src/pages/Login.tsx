@@ -7,6 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import geovannixLogo from '@/assets/geovannix-logo.png';
 
+// The sign-in hero follows the browser language: Spanish for es-*, English otherwise.
+const HERO = typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('es')
+  ? { a: 'Horas claras.', b: 'Nómina sin sorpresas.', sub: 'Equipos, contratos y pagos en un solo lugar, con las reglas que tu empresa define.' }
+  : { a: 'Clear hours.', b: 'No payroll surprises.', sub: 'Teams, contracts and pay in one place, with the rules your company defines.' };
+
 export default function Login() {
   const { signIn, sendPasswordReset, linkError } = useAuth();
   const [mode, setMode] = useState<'signin' | 'forgot'>(linkError ? 'forgot' : 'signin');
@@ -45,8 +50,8 @@ export default function Login() {
           <span className="font-serif text-xl">Trackly</span>
         </div>
         <div className="relative max-w-md">
-          <p className="display-num text-5xl xl:text-6xl leading-[1.02] font-medium">Horas claras.<br /><span className="text-secondary">Nómina sin sorpresas.</span></p>
-          <p className="mt-6 text-primary-foreground/75 text-base leading-relaxed">Equipos, contratos y pagos en un solo lugar, con las reglas que tu empresa define.</p>
+          <p className="display-num text-5xl xl:text-6xl leading-[1.02] font-medium">{HERO.a}<br /><span className="text-secondary">{HERO.b}</span></p>
+          <p className="mt-6 text-primary-foreground/75 text-base leading-relaxed">{HERO.sub}</p>
         </div>
         <p className="relative text-xs text-primary-foreground/60">by Geovannix</p>
       </aside>
